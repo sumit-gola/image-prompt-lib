@@ -39,6 +39,7 @@ class PromptFactory extends Factory
             'ai_provider' => 'openai',
             'ai_model' => 'gpt-5.4',
             'status' => Prompt::STATUS_COMPLETED,
+            'copy_count' => 0,
             'error_message' => null,
             'generated_at' => now(),
         ];

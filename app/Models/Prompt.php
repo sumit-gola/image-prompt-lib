@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $ai_provider
  * @property string|null $ai_model
  * @property string $status
+ * @property int $copy_count
  * @property string|null $error_message
  * @property Carbon|null $generated_at
  * @property Carbon|null $created_at
@@ -40,6 +41,7 @@ use Illuminate\Support\Carbon;
     'ai_provider',
     'ai_model',
     'status',
+    'copy_count',
     'error_message',
     'generated_at',
 ])]
@@ -78,6 +80,13 @@ class Prompt extends Model
     use HasFactory;
 
     /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'copy_count' => 0,
+    ];
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function user(): BelongsTo
@@ -110,6 +119,7 @@ class Prompt extends Model
     {
         return [
             'style_notes' => 'array',
+            'copy_count' => 'integer',
             'generated_at' => 'datetime',
         ];
     }

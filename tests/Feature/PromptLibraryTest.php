@@ -9,6 +9,26 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
+test('homepage shows only completed prompts', function (): void {
+    $completed = Prompt::factory()->create([
+        'title' => 'Editorial studio portrait',
+        'prompt' => 'Create a refined editorial studio portrait with crisp rim lighting.',
+        'status' => Prompt::STATUS_COMPLETED,
+    ]);
+
+    Prompt::factory()->pending()->create([
+        'title' => 'Hidden pending prompt',
+    ]);
+
+    $this->get('/')
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('prompts/index')
+            ->has('prompts.data', 1)
+            ->where('prompts.data.0.id', $completed->id)
+            ->where('prompts.data.0.title', 'Editorial studio portrait'));
+});
+
 test('guests can browse completed prompts', function (): void {
     $completed = Prompt::factory()->create([
         'title' => 'Soft studio portrait',
@@ -25,6 +45,152 @@ test('guests can browse completed prompts', function (): void {
             ->has('prompts.data', 1)
             ->where('prompts.data.0.id', $completed->id)
             ->where('prompts.data.0.prompt', 'Create a soft studio portrait with warm window light.'));
+});
+
+test('search filters prompts by title prompt text and category', function (): void {
+    $matchingTitle = Prompt::factory()->create([
+        'title' => 'Chrome perfume bottle',
+        'prompt' => 'Minimal table top product photograph.',
+        'category' => Prompt::CATEGORY_PRODUCT,
+    ]);
+    $matchingPrompt = Prompt::factory()->create([
+        'title' => 'Window seat portrait',
+        'prompt' => 'A cinematic denim editorial with rain on the glass.',
+        'category' => Prompt::CATEGORY_FASHION,
+    ]);
+    $matchingCategory = Prompt::factory()->create([
+        'title' => 'Clean catalog image',
+        'prompt' => 'White cyclorama product frame.',
+        'category' => Prompt::CATEGORY_ART,
+    ]);
+    Prompt::factory()->create([
+        'title' => 'Unrelated scene',
+        'prompt' => 'A quiet room with soft light.',
+        'category' => Prompt::CATEGORY_LIFESTYLE,
+    ]);
+
+    $titleResults = $this->get('/?search=perfume')->inertiaProps('prompts.data');
+    $promptResults = $this->get('/?search=denim')->inertiaProps('prompts.data');
+    $categoryResults = $this->get('/?search=art')->inertiaProps('prompts.data');
+
+    expect(collect($titleResults)->pluck('id')->all())->toBe([$matchingTitle->id])
+        ->and(collect($promptResults)->pluck('id')->all())->toBe([$matchingPrompt->id])
+        ->and(collect($categoryResults)->pluck('id')->all())->toBe([$matchingCategory->id]);
+});
+
+test('category filter works', function (): void {
+    $fashion = Prompt::factory()->create([
+        'category' => Prompt::CATEGORY_FASHION,
+    ]);
+
+    Prompt::factory()->create([
+        'category' => Prompt::CATEGORY_PRODUCT,
+    ]);
+
+    $this->get('/?category=fashion')
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.category', Prompt::CATEGORY_FASHION)
+            ->has('prompts.data', 1)
+            ->where('prompts.data.0.id', $fashion->id));
+});
+
+test('homepage includes library counts and suggested prompts for empty filters', function (): void {
+    $portrait = Prompt::factory()->create([
+        'category' => Prompt::CATEGORY_PORTRAIT,
+    ]);
+    $fashion = Prompt::factory()->create([
+        'category' => Prompt::CATEGORY_FASHION,
+    ]);
+    Prompt::factory()->pending()->create([
+        'category' => Prompt::CATEGORY_OTHER,
+    ]);
+
+    $response = $this->get('/?category=other')
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('totalCompleted', 2)
+            ->where('categoryCounts.portrait', 1)
+            ->where('categoryCounts.fashion', 1)
+            ->where('categoryCounts.other', 0)
+            ->where('prompts.total', 0)
+            ->has('suggestedPrompts', 2));
+
+    expect(collect($response->inertiaProps('suggestedPrompts'))->pluck('id')->all())
+        ->toEqualCanonicalizing([$portrait->id, $fashion->id]);
+});
+
+test('sort by newest works', function (): void {
+    $old = Prompt::factory()->create([
+        'generated_at' => now()->subDays(3),
+    ]);
+    $new = Prompt::factory()->create([
+        'generated_at' => now()->subHour(),
+    ]);
+
+    $results = $this->get('/?sort=newest')->inertiaProps('prompts.data');
+
+    expect(collect($results)->pluck('id')->all())->toBe([$new->id, $old->id]);
+});
+
+test('sort by most copied works', function (): void {
+    $leastCopied = Prompt::factory()->create([
+        'copy_count' => 2,
+    ]);
+    $mostCopied = Prompt::factory()->create([
+        'copy_count' => 18,
+    ]);
+
+    $results = $this->get('/?sort=most_copied')->inertiaProps('prompts.data');
+
+    expect(collect($results)->pluck('id')->all())->toBe([$mostCopied->id, $leastCopied->id]);
+});
+
+test('copy endpoint increments copy count', function (): void {
+    $prompt = Prompt::factory()->create([
+        'copy_count' => 4,
+        'status' => Prompt::STATUS_COMPLETED,
+    ]);
+
+    $this->postJson("/prompts/{$prompt->id}/copy")
+        ->assertSuccessful()
+        ->assertJson([
+            'copy_count' => 5,
+        ]);
+
+    expect($prompt->refresh()->copy_count)->toBe(5);
+});
+
+test('incomplete prompts cannot be copied publicly', function (): void {
+    $prompt = Prompt::factory()->pending()->create([
+        'copy_count' => 7,
+    ]);
+
+    $this->postJson("/prompts/{$prompt->id}/copy")
+        ->assertNotFound();
+
+    expect($prompt->refresh()->copy_count)->toBe(7);
+});
+
+test('prompt card props include thumbnail preview category and copy count', function (): void {
+    $prompt = Prompt::factory()->create([
+        'title' => 'Soft fashion campaign',
+        'prompt' => 'Create a soft fashion campaign image with layered fabric, clean daylight, and a pale set.',
+        'thumbnail_path' => 'prompts/thumbnails/fashion-card.jpg',
+        'category' => Prompt::CATEGORY_FASHION,
+        'copy_count' => 12,
+    ]);
+
+    $this->get('/')
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('prompts.data.0', fn (Assert $page) => $page
+                ->where('id', $prompt->id)
+                ->where('thumbnail_url', Storage::disk('public')->url('prompts/thumbnails/fashion-card.jpg'))
+                ->where('prompt_preview', 'Create a soft fashion campaign image with layered fabric, clean daylight, and a pale set.')
+                ->where('category', Prompt::CATEGORY_FASHION)
+                ->where('copy_count', 12)
+                ->etc()));
 });
 
 test('non admins cannot upload prompt references', function (): void {
@@ -273,6 +439,7 @@ test('completed prompt detail exposes copyable prompt text', function (): void {
     $prompt = Prompt::factory()->create([
         'prompt' => 'Create a detailed fashion editorial image.',
         'status' => Prompt::STATUS_COMPLETED,
+        'copy_count' => 3,
     ]);
 
     $this->get("/prompts/{$prompt->id}")
@@ -280,7 +447,8 @@ test('completed prompt detail exposes copyable prompt text', function (): void {
         ->assertInertia(fn (Assert $page) => $page
             ->component('prompts/show')
             ->where('promptItem.id', $prompt->id)
-            ->where('promptItem.prompt', 'Create a detailed fashion editorial image.'));
+            ->where('promptItem.prompt', 'Create a detailed fashion editorial image.')
+            ->where('promptItem.copy_count', 3));
 });
 
 test('incomplete prompts are hidden from public detail routes', function (): void {

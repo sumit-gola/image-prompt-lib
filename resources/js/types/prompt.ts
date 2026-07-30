@@ -8,6 +8,8 @@ export type PromptCategory =
 
 export type PromptStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
+export type PromptSort = 'newest' | 'most_copied' | 'oldest' | 'category';
+
 export type PromptStatusSummary = {
     total: number;
     pending: number;
@@ -40,11 +42,14 @@ export type PromptLibraryItem = {
     id: number;
     title: string;
     prompt: string | null;
+    prompt_preview: string;
     negative_prompt: string | null;
     thumbnail_url: string;
     reference_image_url: string;
+    detail_url: string;
     category: PromptCategory | null;
     style_notes: PromptStyleNotes | null;
+    copy_count: number;
     generated_at: string | null;
     created_at: string | null;
 };

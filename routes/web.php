@@ -5,10 +5,11 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PromptController;
 use Illuminate\Support\Facades\Route;
 
-Route::inertia('/', 'welcome')->name('home');
+Route::get('/', [PromptController::class, 'home'])->name('home');
 
 Route::get('prompts', [PromptController::class, 'index'])->name('prompts.index');
 Route::get('prompts/{prompt}', [PromptController::class, 'show'])->name('prompts.show');
+Route::post('prompts/{prompt}/copy', [PromptController::class, 'copy'])->name('prompts.copy');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');

@@ -13,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -123,16 +124,21 @@ class AdminPromptController extends Controller
      */
     protected function adminPromptData(Prompt $prompt): array
     {
+        $promptText = $prompt->prompt ?? '';
+
         return [
             'id' => $prompt->id,
             'title' => $prompt->title,
             'prompt' => $prompt->prompt,
+            'prompt_preview' => Str::of($promptText)->squish()->limit(170)->toString(),
             'negative_prompt' => $prompt->negative_prompt,
             'thumbnail_url' => Storage::disk('public')->url($prompt->thumbnail_path),
             'reference_image_url' => Storage::disk('public')->url($prompt->reference_image_path),
+            'detail_url' => route('prompts.show', $prompt),
             'category' => $prompt->category,
             'style_notes' => $prompt->style_notes,
             'status' => $prompt->status,
+            'copy_count' => $prompt->copy_count,
             'error_message' => $prompt->error_message,
             'ai_provider' => $prompt->ai_provider,
             'ai_model' => $prompt->ai_model,
