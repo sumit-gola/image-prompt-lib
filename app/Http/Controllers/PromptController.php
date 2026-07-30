@@ -43,8 +43,13 @@ class PromptController extends Controller
         $category = in_array($category, Prompt::CATEGORIES, true) ? $category : null;
         $sort = (string) $request->string('sort', self::SORT_NEWEST);
         $sort = in_array($sort, self::SORTS, true) ? $sort : self::SORT_NEWEST;
-        $completedTotal = Prompt::query()->completed()->count();
-        $totalCopies = Prompt::query()->completed()->sum('copy_count');
+        $libraryTotals = Prompt::query()
+            ->completed()
+            ->toBase()
+            ->selectRaw('count(*) as total, coalesce(sum(copy_count), 0) as copies')
+            ->first();
+        $completedTotal = (int) ($libraryTotals->total ?? 0);
+        $totalCopies = (int) ($libraryTotals->copies ?? 0);
         $newestCategory = Prompt::query()
             ->completed()
             ->latest('generated_at')
@@ -131,7 +136,7 @@ class PromptController extends Controller
             'collections' => $this->collectionData($categoryCounts),
             'modelCounts' => $modelCounts,
             'totalCompleted' => $completedTotal,
-            'totalCopies' => (int) $totalCopies,
+            'totalCopies' => $totalCopies,
             'newestCategory' => $newestCategory,
             'filters' => [
                 'search' => $search,
@@ -157,13 +162,17 @@ class PromptController extends Controller
 
     public function copy(Prompt $prompt): JsonResponse
     {
-        abort_unless($prompt->status === Prompt::STATUS_COMPLETED, 404);
+        $updated = Prompt::query()
+            ->completed()
+            ->whereKey($prompt->id)
+            ->increment('copy_count');
 
-        $prompt->increment('copy_count');
-        $prompt->refresh();
+        abort_unless($updated === 1, 404);
 
         return response()->json([
-            'copy_count' => $prompt->copy_count,
+            'copy_count' => (int) Prompt::query()
+                ->whereKey($prompt->id)
+                ->value('copy_count'),
         ]);
     }
 

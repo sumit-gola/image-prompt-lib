@@ -8,6 +8,7 @@ use App\Models\Prompt;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Ai\Image;
@@ -205,6 +206,27 @@ test('copy endpoint increments copy count', function (): void {
     expect($prompt->refresh()->copy_count)->toBe(5);
 });
 
+test('copy endpoint is rate limited', function (): void {
+    $prompt = Prompt::factory()->create([
+        'copy_count' => 0,
+        'status' => Prompt::STATUS_COMPLETED,
+    ]);
+
+    $clientIp = '203.0.113.44';
+
+    for ($i = 0; $i < 30; $i++) {
+        $this->withServerVariables(['REMOTE_ADDR' => $clientIp])
+            ->postJson("/prompts/{$prompt->id}/copy")
+            ->assertSuccessful();
+    }
+
+    $this->withServerVariables(['REMOTE_ADDR' => $clientIp])
+        ->postJson("/prompts/{$prompt->id}/copy")
+        ->assertTooManyRequests();
+
+    expect($prompt->refresh()->copy_count)->toBe(30);
+});
+
 test('incomplete prompts cannot be copied publicly', function (): void {
     $prompt = Prompt::factory()->pending()->create([
         'copy_count' => 7,
@@ -238,6 +260,20 @@ test('prompt card props include thumbnail preview category and copy count', func
                 ->where('source_label', $prompt->user->name)
                 ->where('model_label', 'Claude Sonnet 4')
                 ->etc()));
+});
+
+test('prompt table includes composite indexes for large library queries', function (): void {
+    $indexNames = collect(Schema::getIndexes('prompts'))
+        ->pluck('name')
+        ->all();
+
+    expect($indexNames)
+        ->toContain('prompts_public_newest_index')
+        ->toContain('prompts_public_popular_index')
+        ->toContain('prompts_public_category_index')
+        ->toContain('prompts_admin_status_index')
+        ->toContain('prompts_admin_mode_index')
+        ->toContain('prompts_admin_source_index');
 });
 
 test('non admins cannot upload prompt references', function (): void {
@@ -492,6 +528,31 @@ test('completed prompt edits require prompt text', function (): void {
         ->assertSessionHasErrors('prompt');
 });
 
+test('completed prompt edits default missing generated date', function (): void {
+    $admin = User::factory()->admin()->create();
+    $prompt = Prompt::factory()->failed()->create([
+        'prompt' => 'Ready prompt text',
+        'generated_at' => null,
+    ]);
+
+    $this->actingAs($admin)
+        ->from("/admin/prompts/{$prompt->id}/edit")
+        ->patch("/admin/prompts/{$prompt->id}", [
+            'title' => 'Ready prompt',
+            'prompt' => 'Ready prompt text',
+            'negative_prompt' => '',
+            'thumbnail_prompt' => '',
+            'category' => Prompt::CATEGORY_OTHER,
+            'status' => Prompt::STATUS_COMPLETED,
+        ])
+        ->assertRedirect("/admin/prompts/{$prompt->id}/edit")
+        ->assertSessionHasNoErrors();
+
+    expect($prompt->refresh())
+        ->status->toBe(Prompt::STATUS_COMPLETED)
+        ->generated_at->not->toBeNull();
+});
+
 test('admins can delete prompt records and local assets', function (): void {
     Storage::fake('public');
 
@@ -519,11 +580,13 @@ test('admin prompt bulk actions update selected records', function (): void {
         'prompt' => 'First prompt text',
         'status' => Prompt::STATUS_PENDING,
         'category' => Prompt::CATEGORY_OTHER,
+        'generated_at' => null,
     ]);
     $second = Prompt::factory()->create([
         'prompt' => 'Second prompt text',
         'status' => Prompt::STATUS_FAILED,
         'category' => Prompt::CATEGORY_OTHER,
+        'generated_at' => null,
     ]);
 
     $this->actingAs($admin)
@@ -547,7 +610,9 @@ test('admin prompt bulk actions update selected records', function (): void {
         ->assertSessionHasNoErrors();
 
     expect($first->refresh()->status)->toBe(Prompt::STATUS_COMPLETED)
-        ->and($second->refresh()->status)->toBe(Prompt::STATUS_COMPLETED);
+        ->and($first->generated_at)->not->toBeNull()
+        ->and($second->refresh()->status)->toBe(Prompt::STATUS_COMPLETED)
+        ->and($second->generated_at)->not->toBeNull();
 });
 
 test('admin bulk completed status rejects records without prompt text', function (): void {
@@ -590,6 +655,7 @@ test('admin bulk publish and draft actions update public visibility', function (
 
     expect($draft->refresh())
         ->status->toBe(Prompt::STATUS_COMPLETED)
+        ->generated_at->not->toBeNull()
         ->error_message->toBeNull();
 
     $this->actingAs($admin)

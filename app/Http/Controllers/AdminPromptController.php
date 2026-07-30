@@ -21,6 +21,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -158,6 +159,11 @@ class AdminPromptController extends Controller
     {
         /** @var array{title: string, prompt?: string|null, negative_prompt?: string|null, thumbnail_prompt?: string|null, category?: string|null, status: string, generated_at?: string|null, style_notes?: array<string, string|null>|null} $data */
         $data = $request->validated();
+        $generatedAt = $this->parseDate($data['generated_at'] ?? null);
+
+        if ($data['status'] === Prompt::STATUS_COMPLETED && $generatedAt === null) {
+            $generatedAt = $prompt->generated_at ?? now();
+        }
 
         $attributes = [
             'title' => $data['title'],
@@ -167,7 +173,7 @@ class AdminPromptController extends Controller
             'category' => $data['category'] ?? null,
             'status' => $data['status'],
             'style_notes' => $this->styleNotes($data['style_notes'] ?? null),
-            'generated_at' => $this->parseDate($data['generated_at'] ?? null),
+            'generated_at' => $generatedAt,
         ];
 
         $thumbnail = $request->file('thumbnail');
@@ -388,7 +394,13 @@ class AdminPromptController extends Controller
             return back()->withErrors(['bulk' => 'Completed status can only be applied to prompts with prompt text.']);
         }
 
-        Prompt::query()->whereKey($prompts->modelKeys())->update(['status' => $status]);
+        $attributes = ['status' => $status];
+
+        if ($status === Prompt::STATUS_COMPLETED) {
+            $attributes['generated_at'] = DB::raw('coalesce(generated_at, CURRENT_TIMESTAMP)');
+        }
+
+        Prompt::query()->whereKey($prompts->modelKeys())->update($attributes);
 
         return back()->with('success', $prompts->count().' prompt status'.($prompts->count() === 1 ? '' : 'es').' updated.');
     }
@@ -409,6 +421,7 @@ class AdminPromptController extends Controller
         Prompt::query()->whereKey($prompts->modelKeys())->update([
             'status' => Prompt::STATUS_COMPLETED,
             'error_message' => null,
+            'generated_at' => DB::raw('coalesce(generated_at, CURRENT_TIMESTAMP)'),
         ]);
 
         return back()->with('success', $prompts->count().' prompt'.($prompts->count() === 1 ? '' : 's').' published.');
