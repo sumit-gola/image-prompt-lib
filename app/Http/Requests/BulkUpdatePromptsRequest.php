@@ -17,6 +17,10 @@ class BulkUpdatePromptsRequest extends FormRequest
 
     public const ACTION_RETRY = 'retry';
 
+    public const ACTION_PUBLISH = 'publish';
+
+    public const ACTION_DRAFT = 'draft';
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -38,6 +42,8 @@ class BulkUpdatePromptsRequest extends FormRequest
                 self::ACTION_STATUS,
                 self::ACTION_CATEGORY,
                 self::ACTION_RETRY,
+                self::ACTION_PUBLISH,
+                self::ACTION_DRAFT,
             ])],
             'prompt_ids' => ['required', 'array', 'min:1', 'max:250'],
             'prompt_ids.*' => ['integer', Rule::exists(Prompt::class, 'id')],

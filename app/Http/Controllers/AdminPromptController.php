@@ -211,6 +211,8 @@ class AdminPromptController extends Controller
                 ? $this->bulkCategory($prompts, $category)
                 : back()->withErrors(['bulk' => 'Choose the replacement category.']),
             BulkUpdatePromptsRequest::ACTION_RETRY => $this->bulkRetry($prompts),
+            BulkUpdatePromptsRequest::ACTION_PUBLISH => $this->bulkPublish($prompts),
+            BulkUpdatePromptsRequest::ACTION_DRAFT => $this->bulkDraft($prompts),
             default => back()->withErrors(['bulk' => 'Unsupported bulk action.']),
         };
     }
@@ -389,6 +391,41 @@ class AdminPromptController extends Controller
         Prompt::query()->whereKey($prompts->modelKeys())->update(['status' => $status]);
 
         return back()->with('success', $prompts->count().' prompt status'.($prompts->count() === 1 ? '' : 'es').' updated.');
+    }
+
+    /**
+     * @param  Collection<int, Prompt>  $prompts
+     */
+    private function bulkPublish(Collection $prompts): RedirectResponse
+    {
+        foreach ($prompts as $prompt) {
+            Gate::authorize('update', $prompt);
+        }
+
+        if ($prompts->contains(fn (Prompt $prompt): bool => trim((string) $prompt->prompt) === '')) {
+            return back()->withErrors(['bulk' => 'Only prompts with prompt text can be published.']);
+        }
+
+        Prompt::query()->whereKey($prompts->modelKeys())->update([
+            'status' => Prompt::STATUS_COMPLETED,
+            'error_message' => null,
+        ]);
+
+        return back()->with('success', $prompts->count().' prompt'.($prompts->count() === 1 ? '' : 's').' published.');
+    }
+
+    /**
+     * @param  Collection<int, Prompt>  $prompts
+     */
+    private function bulkDraft(Collection $prompts): RedirectResponse
+    {
+        foreach ($prompts as $prompt) {
+            Gate::authorize('update', $prompt);
+        }
+
+        Prompt::query()->whereKey($prompts->modelKeys())->update(['status' => Prompt::STATUS_PENDING]);
+
+        return back()->with('success', $prompts->count().' prompt'.($prompts->count() === 1 ? '' : 's').' moved to draft.');
     }
 
     /**

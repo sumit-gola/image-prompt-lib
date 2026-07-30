@@ -569,6 +569,64 @@ test('admin bulk completed status rejects records without prompt text', function
     expect($prompt->refresh()->status)->toBe(Prompt::STATUS_PENDING);
 });
 
+test('admin bulk publish and draft actions update public visibility', function (): void {
+    $admin = User::factory()->admin()->create();
+    $draft = Prompt::factory()->pending()->create([
+        'prompt' => 'Ready prompt text',
+        'error_message' => 'Previous transient issue.',
+    ]);
+    $published = Prompt::factory()->create([
+        'prompt' => 'Published prompt text',
+        'status' => Prompt::STATUS_COMPLETED,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch('/admin/prompts/bulk', [
+            'action' => 'publish',
+            'prompt_ids' => [$draft->id],
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect($draft->refresh())
+        ->status->toBe(Prompt::STATUS_COMPLETED)
+        ->error_message->toBeNull();
+
+    $this->actingAs($admin)
+        ->patch('/admin/prompts/bulk', [
+            'action' => 'draft',
+            'prompt_ids' => [$published->id],
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect($published->refresh()->status)->toBe(Prompt::STATUS_PENDING);
+
+    $visibleIds = collect($this->get('/')->inertiaProps('prompts.data'))->pluck('id');
+
+    expect($visibleIds)
+        ->toContain($draft->id)
+        ->not->toContain($published->id);
+});
+
+test('admin bulk publish rejects records without prompt text', function (): void {
+    $admin = User::factory()->admin()->create();
+    $prompt = Prompt::factory()->pending()->create([
+        'prompt' => null,
+    ]);
+
+    $this->actingAs($admin)
+        ->from('/admin/prompts')
+        ->patch('/admin/prompts/bulk', [
+            'action' => 'publish',
+            'prompt_ids' => [$prompt->id],
+        ])
+        ->assertRedirect('/admin/prompts')
+        ->assertSessionHasErrors('bulk');
+
+    expect($prompt->refresh()->status)->toBe(Prompt::STATUS_PENDING);
+});
+
 test('imported prompts cannot be regenerated', function (): void {
     Bus::fake();
 

@@ -1,9 +1,12 @@
 import { Form, Head, Link, router, usePoll } from '@inertiajs/react';
 import {
     AlertCircle,
+    Archive,
     BarChart3,
     Bot,
     ChevronDown,
+    ChevronLeft,
+    ChevronRight,
     CheckCircle2,
     Copy,
     Edit3,
@@ -15,6 +18,7 @@ import {
     LoaderCircle,
     RefreshCw,
     Search,
+    Send,
     SlidersHorizontal,
     Trash2,
     UploadCloud,
@@ -76,7 +80,8 @@ type AdminSort =
 
 type SourceSiteFilter = 'local' | 'promptplum';
 
-type BulkAction = 'status' | 'category' | 'retry' | 'delete';
+type BulkAction =
+    'publish' | 'draft' | 'status' | 'category' | 'retry' | 'delete';
 
 type AdminPerPage = 24 | 48 | 96;
 
@@ -113,9 +118,9 @@ type Props = {
 };
 
 const statusLabels: Record<PromptStatus, string> = {
-    pending: 'Pending',
+    pending: 'Draft',
     processing: 'Processing',
-    completed: 'Completed',
+    completed: 'Published',
     failed: 'Failed',
 };
 
@@ -182,9 +187,8 @@ export default function AdminPrompts({
         filters.per_page ?? 24,
     );
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
-    const [bulkAction, setBulkAction] = useState<BulkAction>('status');
-    const [bulkStatus, setBulkStatus] =
-        useState<PromptStatus>('completed');
+    const [bulkAction, setBulkAction] = useState<BulkAction>('publish');
+    const [bulkStatus, setBulkStatus] = useState<PromptStatus>('completed');
     const [bulkCategory, setBulkCategory] =
         useState<PromptCategory>('portrait');
     const [deletePrompt, setDeletePrompt] = useState<AdminPromptItem | null>(
@@ -604,8 +608,8 @@ export default function AdminPrompts({
                         <DialogTitle>Delete selected prompts?</DialogTitle>
                         <DialogDescription>
                             This deletes {selectedIds.length} prompt
-                            {selectedIds.length === 1 ? '' : 's'} and any
-                            local thumbnail or reference image files.
+                            {selectedIds.length === 1 ? '' : 's'} and any local
+                            thumbnail or reference image files.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -667,7 +671,7 @@ function AdminHeader({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                    <HeaderChip label="Completed" value={summary.completed} />
+                    <HeaderChip label="Published" value={summary.completed} />
                     <HeaderChip
                         label="Attention"
                         tone={
@@ -731,11 +735,15 @@ function SummaryGrid({
 }) {
     const statusItems = [
         {
-            label: 'Completed',
+            label: statusLabels.completed,
             value: summary.completed,
             className: 'bg-emerald-500',
         },
-        { label: 'Pending', value: summary.pending, className: 'bg-amber-400' },
+        {
+            label: statusLabels.pending,
+            value: summary.pending,
+            className: 'bg-amber-400',
+        },
         {
             label: 'Processing',
             value: summary.processing,
@@ -1031,28 +1039,128 @@ function ManagementToolbar({
     const [advancedOpen, setAdvancedOpen] = useState(dateFiltersActive);
 
     return (
-        <section className="rounded-xl border border-slate-200/80 bg-white/78 p-3 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04]">
-            <form onSubmit={submit} className="grid gap-3">
-                <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="grid size-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200">
-                            <Filter className="size-4" />
-                        </span>
-                        <div>
-                            <h2 className="text-sm font-semibold">
-                                Filters
-                            </h2>
-                            <p className="text-xs text-muted-foreground">
-                                Compact controls for large prompt imports.
-                            </p>
+        <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/72 shadow-sm ring-1 ring-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04] dark:ring-white/5">
+            <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+                <form onSubmit={submit} className="grid gap-2 p-2">
+                    <div className="grid items-center gap-2 lg:grid-cols-[minmax(16rem,1.35fr)_repeat(5,minmax(7.25rem,0.7fr))_auto]">
+                        <div className="relative min-w-0">
+                            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+                            <Input
+                                value={search}
+                                onChange={(event) =>
+                                    setSearch(event.target.value)
+                                }
+                                className="h-10 rounded-full border-slate-200 bg-white/88 pl-9 shadow-xs placeholder:text-slate-400 dark:border-white/10 dark:bg-white/[0.04]"
+                                placeholder="Search title, prompt, source, errors"
+                            />
+                        </div>
+                        <FilterSelect
+                            label="Status"
+                            value={status}
+                            onChange={(value) =>
+                                setStatus(value as PromptStatus | 'all')
+                            }
+                            options={statuses.map((option) => ({
+                                value: option,
+                                label: statusLabels[option],
+                            }))}
+                        />
+                        <FilterSelect
+                            label="Category"
+                            value={category}
+                            onChange={(value) =>
+                                setCategory(value as PromptCategory | 'all')
+                            }
+                            options={categories.map((option) => ({
+                                value: option,
+                                label: categoryLabels[option],
+                            }))}
+                        />
+                        <FilterSelect
+                            label="Mode"
+                            value={generationMode}
+                            onChange={(value) =>
+                                setGenerationMode(
+                                    value as PromptGenerationMode | 'all',
+                                )
+                            }
+                            options={generationModes.map((option) => ({
+                                value: option,
+                                label: generationModeLabels[option],
+                            }))}
+                        />
+                        <FilterSelect
+                            label="Source"
+                            value={sourceSite}
+                            onChange={(value) =>
+                                setSourceSite(value as SourceSiteFilter | 'all')
+                            }
+                            options={sourceSites.map((option) => ({
+                                value: option,
+                                label: sourceSiteLabels[option],
+                            }))}
+                        />
+                        <FilterSelect
+                            label="Sort"
+                            value={sort}
+                            onChange={(value) => setSort(value as AdminSort)}
+                            includeAll={false}
+                            options={sorts.map((option) => ({
+                                value: option,
+                                label: sortLabels[option],
+                            }))}
+                        />
+                        <div className="grid grid-cols-[1fr_auto] gap-2">
+                            <Button
+                                type="submit"
+                                className="h-10 rounded-full px-4"
+                            >
+                                <Search />
+                                Apply
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-10 w-10 shrink-0 rounded-full bg-white/88"
+                                title="Refresh"
+                                onClick={() => applyFilters()}
+                            >
+                                <RefreshCw />
+                                <span className="sr-only">Refresh</span>
+                            </Button>
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                        <Collapsible
-                            open={advancedOpen}
-                            onOpenChange={setAdvancedOpen}
-                        >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/70 pt-2 dark:border-white/10">
+                        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                            <span className="flex h-7 items-center gap-1.5 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 text-[11px] font-semibold text-cyan-700 uppercase dark:border-cyan-900/70 dark:bg-cyan-950/40 dark:text-cyan-300">
+                                <Filter className="size-3.5" />
+                                Filter deck
+                            </span>
+                            {activeFilters.length === 0 ? (
+                                <span className="h-7 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+                                    No active filters
+                                </span>
+                            ) : (
+                                activeFilters.map((filter) => (
+                                    <button
+                                        key={filter.key}
+                                        type="button"
+                                        className="group flex h-7 max-w-full items-center gap-1 rounded-full border border-slate-200 bg-white/88 px-2.5 text-[11px] text-slate-700 shadow-xs transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200"
+                                        onClick={filter.onRemove}
+                                        title={`Remove ${filter.label}`}
+                                    >
+                                        <span className="truncate">
+                                            {filter.label}
+                                        </span>
+                                        <X className="size-3 text-muted-foreground group-hover:text-foreground" />
+                                    </button>
+                                ))
+                            )}
+                        </div>
+
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
                             <CollapsibleTrigger asChild>
                                 <Button
                                     type="button"
@@ -1060,12 +1168,12 @@ function ManagementToolbar({
                                     size="sm"
                                     className={
                                         dateFiltersActive
-                                            ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/70 dark:bg-sky-950/40 dark:text-sky-300'
-                                            : undefined
+                                            ? 'h-8 rounded-full border-sky-200 bg-sky-50 px-3 text-xs text-sky-700 dark:border-sky-900/70 dark:bg-sky-950/40 dark:text-sky-300'
+                                            : 'h-8 rounded-full bg-white/88 px-3 text-xs'
                                     }
                                 >
                                     <SlidersHorizontal />
-                                    Advanced filters
+                                    Dates
                                     <ChevronDown
                                         className={
                                             advancedOpen
@@ -1075,108 +1183,26 @@ function ManagementToolbar({
                                     />
                                 </Button>
                             </CollapsibleTrigger>
-                        </Collapsible>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={clearFilters}
-                            disabled={activeFilters.length === 0}
-                        >
-                            <X />
-                            Reset
-                        </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={clearFilters}
+                                disabled={activeFilters.length === 0}
+                                className="h-8 rounded-full bg-white/88 px-3 text-xs"
+                            >
+                                <X />
+                                Reset
+                            </Button>
+                        </div>
                     </div>
-                </div>
 
-                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(16rem,1.4fr)_repeat(5,minmax(8rem,0.75fr))_auto]">
-                    <div className="relative min-w-0 md:col-span-2 xl:col-span-1">
-                        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            className="h-9 bg-white/80 pl-9 dark:bg-white/[0.04]"
-                            placeholder="Search title, prompt, source, errors"
-                        />
-                    </div>
-                    <FilterSelect
-                        label="Status"
-                        value={status}
-                        onChange={(value) =>
-                            setStatus(value as PromptStatus | 'all')
-                        }
-                        options={statuses.map((option) => ({
-                            value: option,
-                            label: statusLabels[option],
-                        }))}
-                    />
-                    <FilterSelect
-                        label="Category"
-                        value={category}
-                        onChange={(value) =>
-                            setCategory(value as PromptCategory | 'all')
-                        }
-                        options={categories.map((option) => ({
-                            value: option,
-                            label: categoryLabels[option],
-                        }))}
-                    />
-                    <FilterSelect
-                        label="Mode"
-                        value={generationMode}
-                        onChange={(value) =>
-                            setGenerationMode(
-                                value as PromptGenerationMode | 'all',
-                            )
-                        }
-                        options={generationModes.map((option) => ({
-                            value: option,
-                            label: generationModeLabels[option],
-                        }))}
-                    />
-                    <FilterSelect
-                        label="Source"
-                        value={sourceSite}
-                        onChange={(value) =>
-                            setSourceSite(value as SourceSiteFilter | 'all')
-                        }
-                        options={sourceSites.map((option) => ({
-                            value: option,
-                            label: sourceSiteLabels[option],
-                        }))}
-                    />
-                    <FilterSelect
-                        label="Sort"
-                        value={sort}
-                        onChange={(value) => setSort(value as AdminSort)}
-                        includeAll={false}
-                        options={sorts.map((option) => ({
-                            value: option,
-                            label: sortLabels[option],
-                        }))}
-                    />
-                    <div className="flex gap-2 md:col-span-2 xl:col-span-1">
-                        <Button type="submit" className="h-9 flex-1 xl:flex-none">
-                            <Search />
-                            Apply
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 shrink-0"
-                            title="Refresh"
-                            onClick={() => applyFilters()}
-                        >
-                            <RefreshCw />
-                            <span className="sr-only">Refresh</span>
-                        </Button>
-                    </div>
-                </div>
-
-                <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
                     <CollapsibleContent>
-                        <div className="grid gap-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-3 md:grid-cols-2 xl:grid-cols-4 dark:border-white/10 dark:bg-white/[0.03]">
+                        <div className="grid gap-2 rounded-xl border border-sky-100 bg-[linear-gradient(135deg,rgb(240_249_255_/_0.72),rgb(255_255_255_/_0.9))] p-2 md:grid-cols-2 xl:grid-cols-[auto_repeat(4,minmax(9rem,1fr))] dark:border-sky-900/40 dark:bg-white/[0.03]">
+                            <div className="flex items-center gap-2 rounded-lg bg-white/72 px-2.5 py-2 text-xs font-semibold text-sky-700 uppercase dark:bg-white/[0.04] dark:text-sky-300">
+                                <SlidersHorizontal className="size-4" />
+                                Date windows
+                            </div>
                             <DateInput
                                 label="Created from"
                                 value={createdFrom}
@@ -1199,30 +1225,8 @@ function ManagementToolbar({
                             />
                         </div>
                     </CollapsibleContent>
-                </Collapsible>
-
-                {activeFilters.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                        {activeFilters.map((filter) => (
-                            <Badge
-                                key={filter.key}
-                                variant="secondary"
-                                className="gap-1 rounded-full py-1 pr-1 pl-2"
-                            >
-                                {filter.label}
-                                <button
-                                    type="button"
-                                    className="rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/10"
-                                    onClick={filter.onRemove}
-                                    aria-label={`Remove ${filter.label}`}
-                                >
-                                    <X className="size-3" />
-                                </button>
-                            </Badge>
-                        ))}
-                    </div>
-                )}
-            </form>
+                </form>
+            </Collapsible>
         </section>
     );
 }
@@ -1242,11 +1246,12 @@ function FilterSelect({
 }) {
     return (
         <div className="grid min-w-0 gap-1">
-            <Label className="text-[11px] font-medium text-muted-foreground">
-                {label}
-            </Label>
+            <Label className="sr-only">{label}</Label>
             <Select value={value} onValueChange={onChange}>
-                <SelectTrigger className="h-9 w-full bg-white/80 dark:bg-white/[0.04]">
+                <SelectTrigger
+                    className="h-10 w-full rounded-full border-slate-200 bg-white/88 px-3 text-sm shadow-xs dark:border-white/10 dark:bg-white/[0.04]"
+                    title={label}
+                >
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1272,14 +1277,14 @@ function DateInput({
     value: string;
 }) {
     return (
-        <div className="grid gap-1">
+        <div className="grid min-w-0 gap-1">
             <Label className="text-[11px] font-medium text-muted-foreground">
                 {label}
             </Label>
             <Input
                 type="date"
                 value={value}
-                className="h-9 bg-white/80 dark:bg-white/[0.04]"
+                className="h-9 rounded-lg border-slate-200 bg-white/88 text-sm shadow-xs dark:border-white/10 dark:bg-white/[0.04]"
                 onChange={(event) => onChange(event.target.value)}
             />
         </div>
@@ -1313,24 +1318,51 @@ function BulkActionBar({
     setBulkStatus: (status: PromptStatus) => void;
     visibleSelectedCount: number;
 }) {
+    const applyLabel =
+        bulkAction === 'publish'
+            ? 'Publish'
+            : bulkAction === 'draft'
+              ? 'Move to draft'
+              : bulkAction === 'delete'
+                ? 'Delete'
+                : bulkAction === 'retry'
+                  ? 'Retry'
+                  : 'Apply';
+    const ApplyIcon =
+        bulkAction === 'publish'
+            ? Send
+            : bulkAction === 'draft'
+              ? Archive
+              : bulkAction === 'delete'
+                ? Trash2
+                : bulkAction === 'retry'
+                  ? RefreshCw
+                  : CheckCircle2;
+
     if (selectedCount === 0) {
         return (
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-slate-200 bg-white/55 px-3 py-2 text-sm text-muted-foreground backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
-                <span className="flex items-center gap-2">
-                    <ListChecks className="size-4" />
-                    Select prompts to enable bulk actions.
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-full border border-slate-200/80 bg-white/62 px-3 py-1.5 text-xs text-muted-foreground shadow-xs backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.03]">
+                <span className="flex items-center gap-1.5">
+                    <ListChecks className="size-3.5" />
+                    Select rows for bulk actions
                 </span>
-                <span className="hidden text-xs sm:inline">
-                    Bulk status, category, retry, and delete
+                <span className="hidden items-center gap-1.5 sm:flex">
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                        Publish
+                    </span>
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                        Draft
+                    </span>
+                    <span>status, category, retry, delete</span>
                 </span>
             </div>
         );
     }
 
     return (
-        <div className="sticky top-2 z-20 grid gap-2 rounded-xl border border-slate-200/80 bg-white/90 p-2 shadow-lg backdrop-blur-xl sm:grid-cols-[auto_minmax(10rem,12rem)_minmax(10rem,12rem)_1fr_auto_auto] sm:items-center dark:border-white/10 dark:bg-background/90">
-            <div className="flex items-center gap-2 text-sm font-medium">
-                <span className="grid size-7 place-items-center rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-950">
+        <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/94 p-2 shadow-lg ring-1 shadow-slate-200/60 ring-white/80 backdrop-blur-xl dark:border-white/10 dark:bg-background/90 dark:shadow-black/30 dark:ring-white/5">
+            <div className="flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 text-sm font-medium dark:border-white/10 dark:bg-white/[0.05]">
+                <span className="grid size-6 place-items-center rounded-full bg-slate-950 text-white dark:bg-white dark:text-slate-950">
                     <ListChecks className="size-4" />
                 </span>
                 {formatNumber(selectedCount)} selected
@@ -1344,10 +1376,12 @@ function BulkActionBar({
                 value={bulkAction}
                 onValueChange={(value) => setBulkAction(value as BulkAction)}
             >
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9 w-[11.25rem] rounded-full bg-white/88">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                    <SelectItem value="publish">Publish selected</SelectItem>
+                    <SelectItem value="draft">Move to draft</SelectItem>
                     <SelectItem value="status">Change status</SelectItem>
                     <SelectItem value="category">Change category</SelectItem>
                     <SelectItem value="retry">Retry generation</SelectItem>
@@ -1361,7 +1395,7 @@ function BulkActionBar({
                         setBulkStatus(value as PromptStatus)
                     }
                 >
-                    <SelectTrigger className="h-9">
+                    <SelectTrigger className="h-9 w-[10rem] rounded-full bg-white/88">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1380,7 +1414,7 @@ function BulkActionBar({
                         setBulkCategory(value as PromptCategory)
                     }
                 >
-                    <SelectTrigger className="h-9">
+                    <SelectTrigger className="h-9 w-[10rem] rounded-full bg-white/88">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1392,25 +1426,27 @@ function BulkActionBar({
                     </SelectContent>
                 </Select>
             )}
-            <div className="hidden sm:block" />
+            <div className="min-w-0 flex-1" />
             <Button
                 type="button"
                 size="sm"
                 variant={bulkAction === 'delete' ? 'destructive' : 'default'}
+                className="h-9 rounded-full px-4"
                 onClick={() =>
                     bulkAction === 'delete'
                         ? setBulkDeleteOpen(true)
                         : runBulkAction()
                 }
             >
-                {bulkAction === 'delete' ? <Trash2 /> : <CheckCircle2 />}
-                Apply action
+                <ApplyIcon />
+                {applyLabel}
             </Button>
             <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={clearSelection}
+                className="h-9 rounded-full bg-white/88"
             >
                 <X />
                 Clear
@@ -1444,8 +1480,8 @@ function PromptManagementList({
     return (
         <Card className="overflow-hidden rounded-xl border-slate-200/80 bg-white/86 py-0 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04]">
             <div className="hidden overflow-x-auto xl:block">
-                <div className="min-w-[1040px]">
-                    <div className="sticky top-0 z-10 grid grid-cols-[2.25rem_4rem_minmax(18rem,1.45fr)_8rem_8rem_8rem_6rem_8rem_8rem] gap-2 border-b bg-slate-50/95 px-3 py-2 text-[11px] font-semibold text-muted-foreground uppercase backdrop-blur dark:bg-background/95">
+                <div className="min-w-[1080px]">
+                    <div className="sticky top-0 z-10 grid grid-cols-[2.25rem_4rem_minmax(18rem,1.45fr)_8rem_8rem_8rem_6rem_8rem_10rem] gap-2 border-b bg-slate-50/95 px-3 py-2 text-[11px] font-semibold text-muted-foreground uppercase backdrop-blur dark:bg-background/95">
                         <Checkbox
                             checked={allVisibleSelected}
                             onCheckedChange={toggleAllVisible}
@@ -1510,7 +1546,7 @@ function PromptTableRow({
     ) => void;
 }) {
     return (
-        <div className="grid grid-cols-[2.25rem_4rem_minmax(18rem,1.45fr)_8rem_8rem_8rem_6rem_8rem_8rem] items-center gap-2 border-b px-3 py-2 last:border-b-0 hover:bg-sky-50/45 dark:hover:bg-white/[0.04]">
+        <div className="grid grid-cols-[2.25rem_4rem_minmax(18rem,1.45fr)_8rem_8rem_8rem_6rem_8rem_10rem] items-center gap-2 border-b px-3 py-2 last:border-b-0 hover:bg-sky-50/45 dark:hover:bg-white/[0.04]">
             <div className="flex items-center">
                 <Checkbox
                     checked={selected}
@@ -1626,7 +1662,10 @@ function PromptMobileCard({
                     <span>Generated {formatDate(prompt.generated_at)}</span>
                     <span>{providerLabel(prompt)}</span>
                 </div>
-                <PromptActions prompt={prompt} setDeletePrompt={setDeletePrompt} />
+                <PromptActions
+                    prompt={prompt}
+                    setDeletePrompt={setDeletePrompt}
+                />
             </div>
         </div>
     );
@@ -1664,6 +1703,25 @@ function PromptActions({
 }) {
     const [copiedText, copy] = useClipboard();
     const promptText = prompt.prompt ?? '';
+    const visibilityAction: BulkAction =
+        prompt.status === 'completed' ? 'draft' : 'publish';
+    const visibilityDisabled =
+        visibilityAction === 'publish' && promptText.trim() === '';
+    const VisibilityIcon = visibilityAction === 'publish' ? Send : Archive;
+    const updateVisibility = () => {
+        if (visibilityDisabled) {
+            return;
+        }
+
+        router.patch(
+            AdminPromptController.bulk(),
+            {
+                action: visibilityAction,
+                prompt_ids: [prompt.id],
+            },
+            { preserveScroll: true },
+        );
+    };
 
     return (
         <div className="flex items-center justify-end gap-1">
@@ -1673,7 +1731,12 @@ function PromptActions({
                     <span className="sr-only">Edit</span>
                 </Link>
             </Button>
-            <Button asChild variant="ghost" size="icon" title="View public page">
+            <Button
+                asChild
+                variant="ghost"
+                size="icon"
+                title="View public page"
+            >
                 <Link href={prompt.detail_url}>
                     <Eye />
                     <span className="sr-only">View</span>
@@ -1690,14 +1753,29 @@ function PromptActions({
                 {copiedText === promptText ? <CheckCircle2 /> : <Copy />}
                 <span className="sr-only">Copy</span>
             </Button>
+            <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                title={
+                    visibilityAction === 'publish'
+                        ? 'Publish prompt'
+                        : 'Move to draft'
+                }
+                onClick={updateVisibility}
+                disabled={visibilityDisabled}
+            >
+                <VisibilityIcon />
+                <span className="sr-only">
+                    {visibilityAction === 'publish' ? 'Publish' : 'Draft'}
+                </span>
+            </Button>
             {prompt.can_regenerate && (
                 <Button
                     asChild
                     variant="ghost"
                     size="icon"
-                    title={
-                        prompt.status === 'failed' ? 'Retry' : 'Regenerate'
-                    }
+                    title={prompt.status === 'failed' ? 'Retry' : 'Regenerate'}
                 >
                     <Link
                         href={AdminPromptController.regenerate(prompt.id)}
@@ -1779,7 +1857,8 @@ function CreationPanels({
                                             onChange={(event) =>
                                                 setSelectedFiles(
                                                     Array.from(
-                                                        event.target.files ?? [],
+                                                        event.target.files ??
+                                                            [],
                                                     ).map((file) => file.name),
                                                 )
                                             }
@@ -1903,7 +1982,7 @@ function AutoGeneratePromptPanel({
                                     id="idea"
                                     name="idea"
                                     rows={4}
-                                    className="min-h-28 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="min-h-28 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
                                     placeholder="Example: cinematic portrait prompt for a replaceable subject in a rainy neon street"
                                 />
                                 {errors.idea && (
@@ -2051,7 +2130,10 @@ function DeletePromptDialog({
     prompt: AdminPromptItem | null;
 }) {
     return (
-        <Dialog open={prompt !== null} onOpenChange={(open) => !open && onClose()}>
+        <Dialog
+            open={prompt !== null}
+            onOpenChange={(open) => !open && onClose()}
+        >
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Delete prompt?</DialogTitle>
@@ -2167,18 +2249,19 @@ function Pagination({
         <div
             className={
                 tone === 'top'
-                    ? 'flex flex-col gap-2 rounded-xl border border-slate-200/80 bg-white/76 px-3 py-2 text-sm shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-white/[0.04]'
-                    : 'flex flex-col gap-2 border-t border-slate-200/80 pt-3 text-sm sm:flex-row sm:items-center sm:justify-between dark:border-white/10'
+                    ? 'flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-white/74 px-2 py-1.5 text-sm shadow-sm ring-1 ring-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04] dark:ring-white/5'
+                    : 'flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200/70 bg-white/54 px-2 py-1.5 text-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.03]'
             }
         >
-            <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
-                <span>
-                    Showing {formatNumber(prompts.from ?? 0)}-
-                    {formatNumber(prompts.to ?? 0)} of{' '}
-                    {formatNumber(prompts.total)}
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="rounded-full bg-slate-950 px-2.5 py-1 font-semibold text-white tabular-nums dark:bg-white dark:text-slate-950">
+                    {formatNumber(prompts.from ?? 0)}-
+                    {formatNumber(prompts.to ?? 0)}
                 </span>
-                <span className="hidden sm:inline">/</span>
-                <span>
+                <span className="rounded-full border border-slate-200 bg-white/80 px-2.5 py-1 text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+                    of {formatNumber(prompts.total)}
+                </span>
+                <span className="rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 font-medium text-sky-700 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-300">
                     Page {formatNumber(prompts.current_page)} of{' '}
                     {formatNumber(prompts.last_page)}
                 </span>
@@ -2190,7 +2273,7 @@ function Pagination({
                         onPerPageChange(Number(value) as AdminPerPage)
                     }
                 >
-                    <SelectTrigger className="h-8 w-[7.5rem] bg-white/80 text-xs dark:bg-white/[0.04]">
+                    <SelectTrigger className="h-8 w-[7.25rem] rounded-full bg-white/88 text-xs shadow-xs dark:bg-white/[0.04]">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -2205,26 +2288,38 @@ function Pagination({
                     asChild
                     variant="outline"
                     size="sm"
-                    className="h-8"
+                    className="h-8 rounded-full bg-white/88 px-3"
                     disabled={!prompts.prev_page_url}
                 >
                     {prompts.prev_page_url ? (
-                        <Link href={prompts.prev_page_url}>Previous</Link>
+                        <Link href={prompts.prev_page_url}>
+                            <ChevronLeft />
+                            Previous
+                        </Link>
                     ) : (
-                        <span>Previous</span>
+                        <span>
+                            <ChevronLeft />
+                            Previous
+                        </span>
                     )}
                 </Button>
                 <Button
                     asChild
                     variant="outline"
                     size="sm"
-                    className="h-8"
+                    className="h-8 rounded-full bg-white/88 px-3"
                     disabled={!prompts.next_page_url}
                 >
                     {prompts.next_page_url ? (
-                        <Link href={prompts.next_page_url}>Next</Link>
+                        <Link href={prompts.next_page_url}>
+                            Next
+                            <ChevronRight />
+                        </Link>
                     ) : (
-                        <span>Next</span>
+                        <span>
+                            Next
+                            <ChevronRight />
+                        </span>
                     )}
                 </Button>
             </div>
