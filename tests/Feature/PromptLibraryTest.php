@@ -8,6 +8,7 @@ use App\Models\Prompt;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -135,6 +136,43 @@ test('homepage includes library counts and suggested prompts for empty filters',
         ->toEqualCanonicalizing([$portrait->id, $fashion->id]);
 });
 
+test('homepage includes seo metadata for the public library', function (): void {
+    Prompt::factory()->create([
+        'title' => 'Cinematic portrait prompt',
+        'prompt' => 'Create a cinematic portrait with soft rim light and editorial styling.',
+    ]);
+
+    $response = $this->get('/')
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('seo.title', 'AI Photo Prompt Library')
+            ->where('seo.description', 'Browse copy-ready AI image prompts with visual thumbnails, style notes, categories, and prompt detail pages for faster creative generation.')
+            ->where('seo.canonical_url', route('home'))
+            ->where('seo.robots', 'index,follow')
+            ->where('seo.open_graph.type', 'website')
+            ->where('seo.twitter.card', 'summary')
+            ->where('seo.structured_data.0.@type', 'WebSite')
+            ->where('seo.structured_data.1.@type', 'CollectionPage'));
+
+    expect($response->inertiaProps('seo.structured_data.1.numberOfItems'))->toBe(1);
+});
+
+test('filtered public pages expose safe canonical and robots metadata', function (): void {
+    Prompt::factory()->create([
+        'title' => 'Portrait prompt',
+        'category' => Prompt::CATEGORY_PORTRAIT,
+    ]);
+
+    $categorySeo = $this->get('/?category=portrait')->inertiaProps('seo');
+    $searchSeo = $this->get('/?search=portrait&sort=popular')->inertiaProps('seo');
+
+    expect($categorySeo['title'])->toBe('Portrait AI Image Prompts')
+        ->and($categorySeo['canonical_url'])->toBe(route('home').'?category=portrait')
+        ->and($categorySeo['robots'])->toBe('index,follow')
+        ->and($searchSeo['canonical_url'])->toBe(route('home'))
+        ->and($searchSeo['robots'])->toBe('noindex,follow');
+});
+
 test('sort by newest works', function (): void {
     $old = Prompt::factory()->create([
         'generated_at' => now()->subDays(3),
@@ -257,9 +295,73 @@ test('prompt card props include thumbnail preview category and copy count', func
                 ->where('prompt_preview', 'Create a soft fashion campaign image with layered fabric, clean daylight, and a pale set.')
                 ->where('category', Prompt::CATEGORY_FASHION)
                 ->where('copy_count', 12)
+                ->where('image_alt', fn (string $alt): bool => str_contains($alt, 'Soft fashion campaign') && str_contains($alt, 'Fashion prompt thumbnail'))
                 ->where('source_label', $prompt->user->name)
                 ->where('model_label', 'Claude Sonnet 4')
                 ->etc()));
+});
+
+test('completed prompt detail includes unique seo metadata and canonical data', function (): void {
+    $prompt = Prompt::factory()->create([
+        'title' => 'Moody bridge portrait',
+        'prompt' => 'Create a moody editorial bridge portrait with shallow depth of field and soft overcast light.',
+        'thumbnail_path' => 'prompts/thumbnails/bridge.jpg',
+        'reference_image_path' => 'prompts/references/bridge.jpg',
+        'category' => Prompt::CATEGORY_PORTRAIT,
+        'style_notes' => [
+            'subject' => 'A fashion subject leaning near a bridge railing.',
+            'composition' => 'Full body portrait with leading lines.',
+            'camera_angle' => 'Eye level.',
+            'lighting' => 'Soft overcast daylight.',
+            'background' => 'Suspension bridge walkway.',
+            'colors' => 'Muted gray and black.',
+            'mood' => 'Moody and editorial.',
+            'quality' => 'High-resolution fashion photography.',
+        ],
+    ]);
+
+    $this->get("/prompts/{$prompt->id}")
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('seo.title', 'Moody bridge portrait AI Image Prompt')
+            ->where('seo.canonical_url', route('prompts.show', $prompt))
+            ->where('seo.robots', 'index,follow')
+            ->where('seo.open_graph.type', 'article')
+            ->where('seo.open_graph.image', url(Storage::disk('public')->url('prompts/references/bridge.jpg')))
+            ->where('seo.twitter.card', 'summary_large_image')
+            ->where('seo.structured_data.0.@type', 'CreativeWork')
+            ->where('seo.structured_data.1.@type', 'ImageObject')
+            ->where('promptItem.image_alt', fn (string $alt): bool => str_contains($alt, 'Moody bridge portrait') && str_contains($alt, 'fashion subject')));
+});
+
+test('sitemap includes completed prompts and excludes incomplete prompts', function (): void {
+    Cache::flush();
+
+    $completed = Prompt::factory()->create([
+        'category' => Prompt::CATEGORY_PRODUCT,
+    ]);
+    $pending = Prompt::factory()->pending()->create();
+    $failed = Prompt::factory()->failed()->create();
+
+    $this->get('/sitemap.xml')
+        ->assertSuccessful()
+        ->assertSee('<?xml version="1.0" encoding="UTF-8"?>', false)
+        ->assertSee(route('home'), false)
+        ->assertSee(route('prompts.index'), false)
+        ->assertSee(route('home').'?category=product', false)
+        ->assertSee(route('prompts.show', $completed), false)
+        ->assertDontSee(route('prompts.show', $pending), false)
+        ->assertDontSee(route('prompts.show', $failed), false);
+});
+
+test('robots txt blocks private routes and exposes sitemap', function (): void {
+    $this->get('/robots.txt')
+        ->assertSuccessful()
+        ->assertSee('User-agent: *', false)
+        ->assertSee('Disallow: /admin', false)
+        ->assertSee('Disallow: /dashboard', false)
+        ->assertSee('Disallow: /login', false)
+        ->assertSee('Sitemap: '.route('seo.sitemap'), false);
 });
 
 test('prompt table includes composite indexes for large library queries', function (): void {

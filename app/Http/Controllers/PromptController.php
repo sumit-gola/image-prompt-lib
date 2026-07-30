@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Prompt;
+use App\Support\PromptSeo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -31,12 +32,12 @@ class PromptController extends Controller
         self::SORT_CATEGORY,
     ];
 
-    public function home(Request $request): Response
+    public function home(Request $request, PromptSeo $seo): Response
     {
-        return $this->index($request);
+        return $this->index($request, $seo);
     }
 
-    public function index(Request $request): Response
+    public function index(Request $request, PromptSeo $seo): Response
     {
         $search = trim((string) $request->string('search'));
         $category = (string) $request->string('category');
@@ -81,6 +82,7 @@ class PromptController extends Controller
             ->all();
 
         $query = Prompt::query()
+            ->select($this->publicPromptColumns())
             ->with('user:id,name')
             ->completed()
             ->when($search !== '', function ($query) use ($search): void {
@@ -110,16 +112,17 @@ class PromptController extends Controller
         $prompts = $query
             ->paginate(12)
             ->withQueryString()
-            ->through(fn (Prompt $prompt): array => $this->promptData($prompt));
+            ->through(fn (Prompt $prompt): array => $this->promptData($prompt, $seo));
 
         $suggestedPrompts = Prompt::query()
+            ->select($this->publicPromptColumns())
             ->with('user:id,name')
             ->completed()
             ->latest('generated_at')
             ->latest()
             ->limit(4)
             ->get()
-            ->map(fn (Prompt $prompt): array => $this->promptData($prompt))
+            ->map(fn (Prompt $prompt): array => $this->promptData($prompt, $seo))
             ->values();
 
         return Inertia::render('prompts/index', [
@@ -138,6 +141,7 @@ class PromptController extends Controller
             'totalCompleted' => $completedTotal,
             'totalCopies' => $totalCopies,
             'newestCategory' => $newestCategory,
+            'seo' => $seo->forIndex($request, $category, $sort, $prompts->total()),
             'filters' => [
                 'search' => $search,
                 'category' => $category,
@@ -146,17 +150,20 @@ class PromptController extends Controller
         ]);
     }
 
-    public function show(Prompt $prompt): Response
+    public function show(Prompt $prompt, PromptSeo $seo): Response
     {
         abort_unless($prompt->status === Prompt::STATUS_COMPLETED, 404);
 
         $prompt->loadMissing('user:id,name');
 
+        $promptData = $this->promptData($prompt, $seo);
+
         return Inertia::render('prompts/show', [
-            'promptItem' => $this->promptData($prompt),
+            'promptItem' => $promptData,
             'categories' => Prompt::CATEGORIES,
             'categoryCounts' => $this->completedCategoryCounts(),
-            'relatedPrompts' => $this->relatedPrompts($prompt),
+            'relatedPrompts' => $this->relatedPrompts($prompt, $seo),
+            'seo' => $seo->forPrompt($prompt, $promptData),
         ]);
     }
 
@@ -179,7 +186,7 @@ class PromptController extends Controller
     /**
      * @return array<string, mixed>
      */
-    protected function promptData(Prompt $prompt): array
+    protected function promptData(Prompt $prompt, PromptSeo $seo): array
     {
         $promptText = $prompt->prompt ?? '';
         $thumbnailUrl = $prompt->thumbnail_path === null
@@ -198,6 +205,7 @@ class PromptController extends Controller
             'thumbnail_prompt' => $prompt->thumbnail_prompt,
             'thumbnail_url' => $thumbnailUrl,
             'reference_image_url' => $referenceImageUrl,
+            'image_alt' => $seo->imageAlt($prompt),
             'detail_url' => route('prompts.show', $prompt),
             'generation_mode' => $prompt->generation_mode,
             'source_idea' => $prompt->source_idea,
@@ -280,9 +288,10 @@ class PromptController extends Controller
     /**
      * @return list<array<string, mixed>>
      */
-    private function relatedPrompts(Prompt $prompt): array
+    private function relatedPrompts(Prompt $prompt, PromptSeo $seo): array
     {
         return array_values(Prompt::query()
+            ->select($this->publicPromptColumns())
             ->with('user:id,name')
             ->completed()
             ->whereKeyNot($prompt->id)
@@ -294,7 +303,7 @@ class PromptController extends Controller
             ->latest()
             ->limit(4)
             ->get()
-            ->map(fn (Prompt $prompt): array => $this->promptData($prompt))
+            ->map(fn (Prompt $prompt): array => $this->promptData($prompt, $seo))
             ->values()
             ->all());
     }
@@ -333,5 +342,30 @@ class PromptController extends Controller
             ->replace(['-', '_'], ' ')
             ->title()
             ->toString();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function publicPromptColumns(): array
+    {
+        return [
+            'id',
+            'user_id',
+            'title',
+            'prompt',
+            'negative_prompt',
+            'thumbnail_prompt',
+            'thumbnail_path',
+            'reference_image_path',
+            'generation_mode',
+            'source_idea',
+            'category',
+            'style_notes',
+            'ai_model',
+            'copy_count',
+            'generated_at',
+            'created_at',
+        ];
     }
 }

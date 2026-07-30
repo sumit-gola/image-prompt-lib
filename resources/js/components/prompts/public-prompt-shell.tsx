@@ -529,9 +529,12 @@ function SearchDialog({
                                     {prompt.thumbnail_url ? (
                                         <img
                                             src={prompt.thumbnail_url}
-                                            alt={prompt.title}
+                                            alt={prompt.image_alt}
+                                            width={144}
+                                            height={144}
                                             className="aspect-square rounded-xl object-cover"
                                             loading="lazy"
+                                            decoding="async"
                                         />
                                     ) : (
                                         <PromptImagePlaceholder

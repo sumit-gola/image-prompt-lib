@@ -3,7 +3,11 @@
 use App\Http\Controllers\AdminPromptController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PromptController;
+use App\Http\Controllers\SeoController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('robots.txt', [SeoController::class, 'robots'])->name('seo.robots');
+Route::get('sitemap.xml', [SeoController::class, 'sitemap'])->name('seo.sitemap');
 
 Route::get('/', [PromptController::class, 'home'])->name('home');
 

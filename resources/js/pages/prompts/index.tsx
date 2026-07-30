@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import {
     ArrowRight,
     CheckCircle2,
@@ -30,6 +30,7 @@ import {
     sortTabs,
 } from '@/components/prompts/prompt-library-config';
 import type { CategoryFilter } from '@/components/prompts/prompt-library-config';
+import { PromptSeoHead } from '@/components/prompts/prompt-seo-head';
 import { PublicPromptShell } from '@/components/prompts/public-prompt-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ import type {
     PromptCollectionItem,
     PromptLibraryItem,
     PromptModelCount,
+    PromptSeoMeta,
     PromptSort,
     PromptTrend,
 } from '@/types';
@@ -57,6 +59,7 @@ type Props = {
     totalCompleted: number;
     totalCopies: number;
     newestCategory: PromptCategory | null;
+    seo: PromptSeoMeta;
     filters: {
         search: string;
         category: PromptCategory | null;
@@ -76,6 +79,7 @@ export default function PromptLibrary({
     totalCompleted,
     totalCopies,
     newestCategory,
+    seo,
     filters,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
@@ -116,14 +120,7 @@ export default function PromptLibrary({
 
     return (
         <>
-            <Head>
-                <title>AI Photo Prompt Library</title>
-                <meta
-                    head-key="description"
-                    name="description"
-                    content="Browse curated AI image-generation prompts with reference thumbnails, copy-ready prompt text, categories, and prompt detail pages."
-                />
-            </Head>
+            <PromptSeoHead seo={seo} />
 
             <PublicPromptShell
                 activeCategory={filters.category}
@@ -388,8 +385,13 @@ function HeroImageStack({
                             featuredPrompt.thumbnail_url ??
                             ''
                         }
-                        alt={featuredPrompt.title}
+                        alt={featuredPrompt.image_alt}
+                        width={1200}
+                        height={1500}
                         className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                        loading="eager"
+                        fetchPriority="high"
+                        decoding="async"
                     />
                 ) : (
                     <PromptImagePlaceholder className="h-full w-full" />
@@ -418,9 +420,12 @@ function HeroImageStack({
                     {prompt.thumbnail_url ? (
                         <img
                             src={prompt.thumbnail_url}
-                            alt={prompt.title}
+                            alt={prompt.image_alt}
+                            width={640}
+                            height={800}
                             className="aspect-[4/5] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
                             loading="lazy"
+                            decoding="async"
                         />
                     ) : (
                         <PromptImagePlaceholder className="aspect-[4/5] w-full" />
@@ -762,9 +767,12 @@ function EmptyState({
                                 {prompt.thumbnail_url ? (
                                     <img
                                         src={prompt.thumbnail_url}
-                                        alt={prompt.title}
+                                        alt={prompt.image_alt}
+                                        width={480}
+                                        height={600}
                                         className="aspect-[4/5] w-full object-cover transition group-hover:scale-[1.035]"
                                         loading="lazy"
+                                        decoding="async"
                                     />
                                 ) : (
                                     <PromptImagePlaceholder className="aspect-[4/5] w-full" />
@@ -907,8 +915,11 @@ function CollectionsSection({
                                             key={url}
                                             src={url}
                                             alt={`${collection.title} collection`}
+                                            width={320}
+                                            height={400}
                                             className="aspect-[4/5] rounded-2xl object-cover shadow-[0_16px_36px_rgb(15_23_42_/_0.18)] transition group-hover:scale-[1.025] dark:shadow-[0_16px_36px_rgb(0_0_0_/_0.26)]"
                                             loading="lazy"
+                                            decoding="async"
                                         />
                                     ))}
                             </div>

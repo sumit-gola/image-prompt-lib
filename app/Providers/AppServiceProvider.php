@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Prompt;
+use App\Observers\PromptObserver;
 use App\Policies\PromptPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -30,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(Prompt::class, PromptPolicy::class);
+        Prompt::observe(PromptObserver::class);
 
         $this->configureDefaults();
         $this->configureRateLimiters();

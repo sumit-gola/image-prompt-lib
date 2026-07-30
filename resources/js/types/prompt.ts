@@ -1,21 +1,12 @@
 export type PromptCategory =
-    | 'portrait'
-    | 'product'
-    | 'fashion'
-    | 'lifestyle'
-    | 'art'
-    | 'other';
+    'portrait' | 'product' | 'fashion' | 'lifestyle' | 'art' | 'other';
 
 export type PromptStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 export type PromptGenerationMode = 'reference_image' | 'auto' | 'imported';
 
 export type PromptSort =
-    | 'newest'
-    | 'popular'
-    | 'most_copied'
-    | 'oldest'
-    | 'category';
+    'newest' | 'popular' | 'most_copied' | 'oldest' | 'category';
 
 export type PromptStatusSummary = {
     total: number;
@@ -61,6 +52,7 @@ export type PromptLibraryItem = {
     thumbnail_prompt: string | null;
     thumbnail_url: string | null;
     reference_image_url: string | null;
+    image_alt: string;
     detail_url: string;
     generation_mode: PromptGenerationMode;
     source_idea: string | null;
@@ -71,6 +63,27 @@ export type PromptLibraryItem = {
     model_label: string | null;
     generated_at: string | null;
     created_at: string | null;
+};
+
+export type PromptSeoMeta = {
+    title: string;
+    description: string;
+    canonical_url: string;
+    robots: string;
+    open_graph: {
+        type: string;
+        title: string;
+        description: string;
+        url: string;
+        image: string | null;
+    };
+    twitter: {
+        card: string;
+        title: string;
+        description: string;
+        image: string | null;
+    };
+    structured_data: Record<string, unknown>[];
 };
 
 export type PromptTrend = {

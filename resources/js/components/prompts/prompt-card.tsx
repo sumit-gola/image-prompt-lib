@@ -28,6 +28,7 @@ export function PromptCard({ featured = false, prompt }: Props) {
         usePromptActions(prompt);
     const promptText = prompt.prompt ?? '';
     const isCopied = copiedValue === promptText;
+    const imageLoading = featured ? 'eager' : 'lazy';
     const shareTitle =
         shareStatus === 'link-copied'
             ? 'Link copied'
@@ -51,9 +52,13 @@ export function PromptCard({ featured = false, prompt }: Props) {
                     {prompt.thumbnail_url ? (
                         <img
                             src={prompt.thumbnail_url}
-                            alt={prompt.title}
+                            alt={prompt.image_alt}
+                            width={960}
+                            height={1200}
                             className={`w-full object-cover transition duration-500 group-hover:scale-[1.035] ${featured ? 'aspect-[4/5] lg:aspect-[3/4]' : 'aspect-[4/5]'}`}
-                            loading="lazy"
+                            loading={imageLoading}
+                            fetchPriority={featured ? 'high' : 'auto'}
+                            decoding="async"
                         />
                     ) : (
                         <PromptImagePlaceholder

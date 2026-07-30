@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import { ArrowLeft, Check, Copy, Eye, Share2, Sparkles } from 'lucide-react';
 import PromptController from '@/actions/App/Http/Controllers/PromptController';
 import { PromptCard } from '@/components/prompts/prompt-card';
@@ -9,6 +9,7 @@ import {
     formatCount,
     formatGeneratedDate,
 } from '@/components/prompts/prompt-library-config';
+import { PromptSeoHead } from '@/components/prompts/prompt-seo-head';
 import {
     PromptTextPanel,
     StyleNotesPanel,
@@ -23,13 +24,14 @@ import {
 } from '@/components/ui/tooltip';
 import { usePromptActions } from '@/hooks/use-prompt-actions';
 import { home } from '@/routes';
-import type { PromptCategory, PromptLibraryItem } from '@/types';
+import type { PromptCategory, PromptLibraryItem, PromptSeoMeta } from '@/types';
 
 type Props = {
     promptItem: PromptLibraryItem;
     categories: PromptCategory[];
     categoryCounts: Record<PromptCategory, number>;
     relatedPrompts: PromptLibraryItem[];
+    seo: PromptSeoMeta;
 };
 
 export default function PromptShow({
@@ -37,6 +39,7 @@ export default function PromptShow({
     categories,
     categoryCounts,
     relatedPrompts,
+    seo,
 }: Props) {
     const totalCompleted = Object.values(categoryCounts).reduce(
         (sum, count) => sum + count,
@@ -62,14 +65,7 @@ export default function PromptShow({
 
     return (
         <>
-            <Head>
-                <title>{promptItem.title}</title>
-                <meta
-                    head-key="description"
-                    name="description"
-                    content={promptItem.prompt_preview}
-                />
-            </Head>
+            <PromptSeoHead seo={seo} />
 
             <PublicPromptShell
                 activeCategory={promptItem.category}
@@ -104,7 +100,12 @@ export default function PromptShow({
                                 {displayImageUrl ? (
                                     <img
                                         src={displayImageUrl}
-                                        alt={promptItem.title}
+                                        alt={promptItem.image_alt}
+                                        width={1200}
+                                        height={1500}
+                                        loading="eager"
+                                        fetchPriority="high"
+                                        decoding="async"
                                         className="aspect-[4/5] w-full object-cover md:aspect-[16/13] xl:aspect-[4/5]"
                                     />
                                 ) : (
