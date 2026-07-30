@@ -23,6 +23,12 @@ export type PromptStatusSummary = {
     processing: number;
     completed: number;
     failed: number;
+    imported: number;
+    auto: number;
+    reference_image: number;
+    total_copies: number;
+    latest_generated_at: string | null;
+    failed_needing_attention: number;
 };
 
 export type PromptAiConfiguration = {
@@ -90,9 +96,15 @@ export type PromptModelCount = {
 
 export type AdminPromptItem = PromptLibraryItem & {
     status: PromptStatus;
+    source_site: string | null;
+    source_slug: string | null;
+    source_url: string | null;
+    source_thumbnail_url: string | null;
+    can_regenerate: boolean;
     error_message: string | null;
     ai_provider: string | null;
     ai_model: string | null;
+    edit_url: string;
     user: {
         id: number;
         name: string;

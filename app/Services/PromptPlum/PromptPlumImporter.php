@@ -219,7 +219,7 @@ class PromptPlumImporter
             throw new RuntimeException('Missing thumbnail image URL.');
         }
 
-        if ($data['image_url'] !== null && ($thumbnailPath === null || $data['image_url'] !== $existingPrompt?->source_thumbnail_url)) {
+        if ($data['image_url'] !== null && ($thumbnailPath === null || $data['image_url'] !== $existingPrompt->source_thumbnail_url)) {
             $thumbnailPath = $this->storeThumbnail($data['image_url'], $data['slug']);
         }
 

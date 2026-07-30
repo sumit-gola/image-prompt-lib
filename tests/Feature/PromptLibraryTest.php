@@ -297,30 +297,283 @@ test('admins can view prompt dashboard summaries', function (): void {
     Prompt::factory()->create(['status' => Prompt::STATUS_COMPLETED]);
     Prompt::factory()->pending()->create();
     Prompt::factory()->failed()->create();
+    Prompt::factory()->auto()->create(['copy_count' => 4]);
+    Prompt::factory()->imported()->create(['copy_count' => 6]);
 
     $this->actingAs($admin)
         ->get('/admin/prompts')
         ->assertSuccessful()
         ->assertInertia(fn (Assert $page) => $page
             ->component('admin/prompts/index')
-            ->where('summary.total', 3)
-            ->where('summary.completed', 1)
+            ->where('summary.total', 5)
+            ->where('summary.completed', 3)
             ->where('summary.pending', 1)
             ->where('summary.failed', 1)
+            ->where('summary.imported', 1)
+            ->where('summary.auto', 1)
+            ->where('summary.reference_image', 3)
+            ->where('summary.total_copies', 10)
             ->where('aiConfiguration.is_configured', false)
             ->where('aiConfiguration.credential_env', 'OPENAI_API_KEY')
             ->where('imageAiConfiguration.is_configured', false)
             ->where('imageAiConfiguration.credential_env', 'GEMINI_API_KEY'));
 });
 
+test('guest and non admin users cannot access prompt management', function (): void {
+    $this->get('/admin/prompts')
+        ->assertRedirect('/login');
+
+    $this->actingAs(User::factory()->create())
+        ->get('/admin/prompts')
+        ->assertForbidden();
+});
+
+test('admin prompt management filters and sorts prompt records', function (): void {
+    $admin = User::factory()->admin()->create();
+    $local = Prompt::factory()->create([
+        'title' => 'Local portrait record',
+        'category' => Prompt::CATEGORY_PORTRAIT,
+        'copy_count' => 3,
+        'generated_at' => now()->subDays(2),
+    ]);
+    $imported = Prompt::factory()->imported()->create([
+        'title' => 'PromptPlum product record',
+        'category' => Prompt::CATEGORY_PRODUCT,
+        'copy_count' => 19,
+        'source_slug' => 'chrome-perfume-source',
+        'generated_at' => now()->subDay(),
+    ]);
+    $auto = Prompt::factory()->auto()->failed()->create([
+        'title' => 'Auto failed record',
+        'category' => Prompt::CATEGORY_ART,
+        'copy_count' => 9,
+        'generated_at' => now(),
+    ]);
+
+    $statusResults = $this->actingAs($admin)
+        ->get('/admin/prompts?status=failed')
+        ->inertiaProps('prompts.data');
+    $categoryResults = $this->actingAs($admin)
+        ->get('/admin/prompts?category=product')
+        ->inertiaProps('prompts.data');
+    $modeResults = $this->actingAs($admin)
+        ->get('/admin/prompts?generation_mode=imported')
+        ->inertiaProps('prompts.data');
+    $sourceResults = $this->actingAs($admin)
+        ->get('/admin/prompts?source_site=local&sort=title')
+        ->inertiaProps('prompts.data');
+    $searchResults = $this->actingAs($admin)
+        ->get('/admin/prompts?search=chrome-perfume-source')
+        ->inertiaProps('prompts.data');
+    $copySortResults = $this->actingAs($admin)
+        ->get('/admin/prompts?sort=most_copied')
+        ->inertiaProps('prompts.data');
+
+    expect(collect($statusResults)->pluck('id')->all())->toBe([$auto->id])
+        ->and(collect($categoryResults)->pluck('id')->all())->toBe([$imported->id])
+        ->and(collect($modeResults)->pluck('id')->all())->toBe([$imported->id])
+        ->and(collect($sourceResults)->pluck('id')->all())->toBe([$auto->id, $local->id])
+        ->and(collect($searchResults)->pluck('id')->all())->toBe([$imported->id])
+        ->and(collect($copySortResults)->pluck('id')->first())->toBe($imported->id);
+});
+
+test('admins can open the prompt edit page', function (): void {
+    $admin = User::factory()->admin()->create();
+    $prompt = Prompt::factory()->create([
+        'title' => 'Editable prompt',
+        'copy_count' => 12,
+    ]);
+
+    $this->actingAs($admin)
+        ->get("/admin/prompts/{$prompt->id}/edit")
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('admin/prompts/edit')
+            ->where('promptItem.id', $prompt->id)
+            ->where('promptItem.title', 'Editable prompt')
+            ->where('promptItem.copy_count', 12)
+            ->where('promptItem.edit_url', route('admin.prompts.edit', $prompt))
+            ->where('statuses.0', Prompt::STATUS_PENDING)
+            ->where('categories.0', Prompt::CATEGORY_PORTRAIT));
+});
+
+test('admins can update prompt metadata and replace assets', function (): void {
+    Storage::fake('public');
+
+    Storage::disk('public')->put('prompts/thumbnails/old.jpg', 'old-thumbnail');
+    Storage::disk('public')->put('prompts/references/old.jpg', 'old-reference');
+
+    $admin = User::factory()->admin()->create();
+    $prompt = Prompt::factory()->failed()->create([
+        'thumbnail_path' => 'prompts/thumbnails/old.jpg',
+        'reference_image_path' => 'prompts/references/old.jpg',
+    ]);
+
+    $this->actingAs($admin)
+        ->from("/admin/prompts/{$prompt->id}/edit")
+        ->patch("/admin/prompts/{$prompt->id}", [
+            'title' => 'Updated prompt title',
+            'prompt' => 'Create a refined art prompt with clean studio lighting.',
+            'negative_prompt' => ' ',
+            'thumbnail_prompt' => 'Bright art thumbnail prompt.',
+            'category' => Prompt::CATEGORY_ART,
+            'status' => Prompt::STATUS_COMPLETED,
+            'generated_at' => '2026-07-30 10:20:00',
+            'style_notes' => [
+                'subject' => 'Replaceable subject.',
+                'lighting' => 'Softbox key light.',
+                'mood' => 'Calm and polished.',
+            ],
+            'thumbnail' => UploadedFile::fake()->image('new-thumbnail.jpg', 600, 600)->size(200),
+            'reference_image' => UploadedFile::fake()->image('new-reference.jpg', 800, 1000)->size(300),
+        ])
+        ->assertRedirect("/admin/prompts/{$prompt->id}/edit")
+        ->assertSessionHasNoErrors();
+
+    $prompt->refresh();
+
+    expect($prompt)
+        ->title->toBe('Updated prompt title')
+        ->prompt->toBe('Create a refined art prompt with clean studio lighting.')
+        ->negative_prompt->toBeNull()
+        ->thumbnail_prompt->toBe('Bright art thumbnail prompt.')
+        ->category->toBe(Prompt::CATEGORY_ART)
+        ->status->toBe(Prompt::STATUS_COMPLETED)
+        ->generated_at->format('Y-m-d H:i:s')->toBe('2026-07-30 10:20:00');
+
+    expect($prompt->style_notes)
+        ->toHaveKey('subject', 'Replaceable subject.')
+        ->toHaveKey('lighting', 'Softbox key light.')
+        ->toHaveKey('mood', 'Calm and polished.');
+
+    Storage::disk('public')->assertMissing('prompts/thumbnails/old.jpg');
+    Storage::disk('public')->assertMissing('prompts/references/old.jpg');
+    Storage::disk('public')->assertExists($prompt->thumbnail_path);
+    Storage::disk('public')->assertExists($prompt->reference_image_path);
+});
+
+test('completed prompt edits require prompt text', function (): void {
+    $admin = User::factory()->admin()->create();
+    $prompt = Prompt::factory()->failed()->create();
+
+    $this->actingAs($admin)
+        ->from("/admin/prompts/{$prompt->id}/edit")
+        ->patch("/admin/prompts/{$prompt->id}", [
+            'title' => 'Needs prompt',
+            'prompt' => '',
+            'negative_prompt' => '',
+            'thumbnail_prompt' => '',
+            'category' => Prompt::CATEGORY_OTHER,
+            'status' => Prompt::STATUS_COMPLETED,
+        ])
+        ->assertRedirect("/admin/prompts/{$prompt->id}/edit")
+        ->assertSessionHasErrors('prompt');
+});
+
+test('admins can delete prompt records and local assets', function (): void {
+    Storage::fake('public');
+
+    Storage::disk('public')->put('prompts/thumbnails/delete.jpg', 'thumbnail');
+    Storage::disk('public')->put('prompts/references/delete.jpg', 'reference');
+
+    $admin = User::factory()->admin()->create();
+    $prompt = Prompt::factory()->create([
+        'thumbnail_path' => 'prompts/thumbnails/delete.jpg',
+        'reference_image_path' => 'prompts/references/delete.jpg',
+    ]);
+
+    $this->actingAs($admin)
+        ->delete("/admin/prompts/{$prompt->id}")
+        ->assertRedirect();
+
+    $this->assertDatabaseMissing('prompts', ['id' => $prompt->id]);
+    Storage::disk('public')->assertMissing('prompts/thumbnails/delete.jpg');
+    Storage::disk('public')->assertMissing('prompts/references/delete.jpg');
+});
+
+test('admin prompt bulk actions update selected records', function (): void {
+    $admin = User::factory()->admin()->create();
+    $first = Prompt::factory()->create([
+        'prompt' => 'First prompt text',
+        'status' => Prompt::STATUS_PENDING,
+        'category' => Prompt::CATEGORY_OTHER,
+    ]);
+    $second = Prompt::factory()->create([
+        'prompt' => 'Second prompt text',
+        'status' => Prompt::STATUS_FAILED,
+        'category' => Prompt::CATEGORY_OTHER,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch('/admin/prompts/bulk', [
+            'action' => 'category',
+            'prompt_ids' => [$first->id, $second->id],
+            'category' => Prompt::CATEGORY_FASHION,
+        ])
+        ->assertRedirect();
+
+    expect($first->refresh()->category)->toBe(Prompt::CATEGORY_FASHION)
+        ->and($second->refresh()->category)->toBe(Prompt::CATEGORY_FASHION);
+
+    $this->actingAs($admin)
+        ->patch('/admin/prompts/bulk', [
+            'action' => 'status',
+            'prompt_ids' => [$first->id, $second->id],
+            'status' => Prompt::STATUS_COMPLETED,
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect($first->refresh()->status)->toBe(Prompt::STATUS_COMPLETED)
+        ->and($second->refresh()->status)->toBe(Prompt::STATUS_COMPLETED);
+});
+
+test('admin bulk completed status rejects records without prompt text', function (): void {
+    $admin = User::factory()->admin()->create();
+    $prompt = Prompt::factory()->pending()->create([
+        'prompt' => null,
+    ]);
+
+    $this->actingAs($admin)
+        ->from('/admin/prompts')
+        ->patch('/admin/prompts/bulk', [
+            'action' => 'status',
+            'prompt_ids' => [$prompt->id],
+            'status' => Prompt::STATUS_COMPLETED,
+        ])
+        ->assertRedirect('/admin/prompts')
+        ->assertSessionHasErrors('bulk');
+
+    expect($prompt->refresh()->status)->toBe(Prompt::STATUS_PENDING);
+});
+
+test('imported prompts cannot be regenerated', function (): void {
+    Bus::fake();
+
+    $admin = User::factory()->admin()->create();
+    $prompt = Prompt::factory()->imported()->failed()->create();
+
+    $this->actingAs($admin)
+        ->post("/admin/prompts/{$prompt->id}/regenerate")
+        ->assertStatus(422);
+
+    expect($prompt->refresh()->status)->toBe(Prompt::STATUS_FAILED);
+    Bus::assertNotDispatched(GeneratePromptFromReferenceImageJob::class);
+    Bus::assertNotDispatched(GenerateAutoPromptJob::class);
+});
+
 test('admins can regenerate failed prompt references', function (): void {
     Bus::fake();
+    Storage::fake('public');
+
+    Storage::disk('public')->put('prompts/references/failed.jpg', 'failed-reference');
 
     $admin = User::factory()->admin()->create();
     $prompt = Prompt::factory()->failed()->create([
         'title' => 'Failed prompt',
         'prompt' => 'Old prompt',
         'error_message' => 'Old error',
+        'reference_image_path' => 'prompts/references/failed.jpg',
     ]);
 
     $this->actingAs($admin)

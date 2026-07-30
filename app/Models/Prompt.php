@@ -73,6 +73,13 @@ class Prompt extends Model
 
     public const STATUS_FAILED = 'failed';
 
+    public const STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_PROCESSING,
+        self::STATUS_COMPLETED,
+        self::STATUS_FAILED,
+    ];
+
     public const GENERATION_MODE_REFERENCE_IMAGE = 'reference_image';
 
     public const GENERATION_MODE_AUTO = 'auto';
@@ -132,6 +139,75 @@ class Prompt extends Model
     public function scopeCompleted(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_COMPLETED);
+    }
+
+    /**
+     * @param  Builder<Prompt>  $query
+     * @return Builder<Prompt>
+     */
+    public function scopeSearch(Builder $query, ?string $search): Builder
+    {
+        $search = is_string($search) ? trim($search) : '';
+
+        if ($search === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $query) use ($search): void {
+            $query->where('title', 'like', "%{$search}%")
+                ->orWhere('prompt', 'like', "%{$search}%")
+                ->orWhere('source_idea', 'like', "%{$search}%")
+                ->orWhere('source_url', 'like', "%{$search}%")
+                ->orWhere('source_slug', 'like', "%{$search}%")
+                ->orWhere('thumbnail_prompt', 'like', "%{$search}%")
+                ->orWhere('error_message', 'like', "%{$search}%");
+        });
+    }
+
+    /**
+     * @param  Builder<Prompt>  $query
+     * @return Builder<Prompt>
+     */
+    public function scopeWithStatus(Builder $query, ?string $status): Builder
+    {
+        return in_array($status, self::STATUSES, true)
+            ? $query->where('status', $status)
+            : $query;
+    }
+
+    /**
+     * @param  Builder<Prompt>  $query
+     * @return Builder<Prompt>
+     */
+    public function scopeWithCategory(Builder $query, ?string $category): Builder
+    {
+        return in_array($category, self::CATEGORIES, true)
+            ? $query->where('category', $category)
+            : $query;
+    }
+
+    /**
+     * @param  Builder<Prompt>  $query
+     * @return Builder<Prompt>
+     */
+    public function scopeWithGenerationMode(Builder $query, ?string $generationMode): Builder
+    {
+        return in_array($generationMode, self::GENERATION_MODES, true)
+            ? $query->where('generation_mode', $generationMode)
+            : $query;
+    }
+
+    /**
+     * @param  Builder<Prompt>  $query
+     * @return Builder<Prompt>
+     */
+    public function scopeWithSourceSite(Builder $query, ?string $sourceSite): Builder
+    {
+        return match ($sourceSite) {
+            'promptplum' => $query->where('source_site', 'promptplum'),
+            'local' => $query->whereNull('source_site'),
+            default => $query,
+        };
     }
 
     public static function normalizeCategory(mixed $category): string
