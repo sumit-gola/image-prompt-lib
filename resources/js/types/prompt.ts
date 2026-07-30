@@ -8,7 +8,12 @@ export type PromptCategory =
 
 export type PromptStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
-export type PromptSort = 'newest' | 'most_copied' | 'oldest' | 'category';
+export type PromptSort =
+    | 'newest'
+    | 'popular'
+    | 'most_copied'
+    | 'oldest'
+    | 'category';
 
 export type PromptStatusSummary = {
     total: number;
@@ -50,8 +55,31 @@ export type PromptLibraryItem = {
     category: PromptCategory | null;
     style_notes: PromptStyleNotes | null;
     copy_count: number;
+    source_label: string | null;
+    model_label: string | null;
     generated_at: string | null;
     created_at: string | null;
+};
+
+export type PromptTrend = {
+    label: string;
+    category: PromptCategory | null;
+    search: string;
+    count: number;
+};
+
+export type PromptCollectionItem = {
+    category: PromptCategory;
+    title: string;
+    description: string;
+    prompt_count: number;
+    thumbnails: string[];
+};
+
+export type PromptModelCount = {
+    model: string;
+    label: string;
+    count: number;
 };
 
 export type AdminPromptItem = PromptLibraryItem & {

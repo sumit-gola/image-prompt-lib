@@ -1,5 +1,6 @@
 import { useHttp } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import PromptController from '@/actions/App/Http/Controllers/PromptController';
 import { useClipboard } from '@/hooks/use-clipboard';
 import type { PromptLibraryItem } from '@/types';
@@ -46,6 +47,9 @@ export function usePromptActions(prompt: PromptLibraryItem) {
 
         if (copied) {
             setCopiedValue(value);
+            toast.success('Copied to clipboard');
+        } else {
+            toast.error('Clipboard access was blocked');
         }
 
         return copied;
@@ -67,6 +71,7 @@ export function usePromptActions(prompt: PromptLibraryItem) {
             setCopyCount(response.copy_count);
         } catch {
             setCopyCount((count) => Math.max(0, count - 1));
+            toast.error('Copy count could not be updated');
         }
 
         return true;
@@ -84,6 +89,7 @@ export function usePromptActions(prompt: PromptLibraryItem) {
                     url,
                 });
                 setShareStatus('shared');
+                toast.success('Share sheet opened');
 
                 return;
             } catch (error) {
@@ -97,6 +103,9 @@ export function usePromptActions(prompt: PromptLibraryItem) {
 
         if (copied) {
             setShareStatus('link-copied');
+            toast.success('Prompt link copied');
+        } else {
+            toast.error('Share link could not be copied');
         }
     };
 

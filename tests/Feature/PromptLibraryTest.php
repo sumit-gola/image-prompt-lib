@@ -98,9 +98,13 @@ test('category filter works', function (): void {
 test('homepage includes library counts and suggested prompts for empty filters', function (): void {
     $portrait = Prompt::factory()->create([
         'category' => Prompt::CATEGORY_PORTRAIT,
+        'copy_count' => 3,
+        'generated_at' => now()->subDay(),
     ]);
     $fashion = Prompt::factory()->create([
         'category' => Prompt::CATEGORY_FASHION,
+        'copy_count' => 7,
+        'generated_at' => now(),
     ]);
     Prompt::factory()->pending()->create([
         'category' => Prompt::CATEGORY_OTHER,
@@ -110,11 +114,18 @@ test('homepage includes library counts and suggested prompts for empty filters',
         ->assertSuccessful()
         ->assertInertia(fn (Assert $page) => $page
             ->where('totalCompleted', 2)
+            ->where('totalCopies', 10)
+            ->where('newestCategory', Prompt::CATEGORY_FASHION)
             ->where('categoryCounts.portrait', 1)
             ->where('categoryCounts.fashion', 1)
             ->where('categoryCounts.other', 0)
             ->where('prompts.total', 0)
-            ->has('suggestedPrompts', 2));
+            ->has('suggestedPrompts', 2)
+            ->has('trendingSearches', 2)
+            ->has('collections', 2)
+            ->where('modelCounts.0.model', 'gpt-5.4')
+            ->where('modelCounts.0.label', 'Gpt 5.4')
+            ->where('modelCounts.0.count', 2));
 
     expect(collect($response->inertiaProps('suggestedPrompts'))->pluck('id')->all())
         ->toEqualCanonicalizing([$portrait->id, $fashion->id]);
@@ -133,6 +144,21 @@ test('sort by newest works', function (): void {
     expect(collect($results)->pluck('id')->all())->toBe([$new->id, $old->id]);
 });
 
+test('sort by popular works', function (): void {
+    $leastPopular = Prompt::factory()->create([
+        'copy_count' => 2,
+        'generated_at' => now(),
+    ]);
+    $mostPopular = Prompt::factory()->create([
+        'copy_count' => 18,
+        'generated_at' => now()->subDay(),
+    ]);
+
+    $results = $this->get('/?sort=popular')->inertiaProps('prompts.data');
+
+    expect(collect($results)->pluck('id')->all())->toBe([$mostPopular->id, $leastPopular->id]);
+});
+
 test('sort by most copied works', function (): void {
     $leastCopied = Prompt::factory()->create([
         'copy_count' => 2,
@@ -144,6 +170,21 @@ test('sort by most copied works', function (): void {
     $results = $this->get('/?sort=most_copied')->inertiaProps('prompts.data');
 
     expect(collect($results)->pluck('id')->all())->toBe([$mostCopied->id, $leastCopied->id]);
+});
+
+test('sort by category works', function (): void {
+    $fashion = Prompt::factory()->create([
+        'category' => Prompt::CATEGORY_FASHION,
+        'generated_at' => now(),
+    ]);
+    $art = Prompt::factory()->create([
+        'category' => Prompt::CATEGORY_ART,
+        'generated_at' => now()->subDay(),
+    ]);
+
+    $results = $this->get('/?sort=category')->inertiaProps('prompts.data');
+
+    expect(collect($results)->pluck('id')->all())->toBe([$art->id, $fashion->id]);
 });
 
 test('copy endpoint increments copy count', function (): void {
@@ -179,6 +220,7 @@ test('prompt card props include thumbnail preview category and copy count', func
         'thumbnail_path' => 'prompts/thumbnails/fashion-card.jpg',
         'category' => Prompt::CATEGORY_FASHION,
         'copy_count' => 12,
+        'ai_model' => 'claude-sonnet-4',
     ]);
 
     $this->get('/')
@@ -190,6 +232,8 @@ test('prompt card props include thumbnail preview category and copy count', func
                 ->where('prompt_preview', 'Create a soft fashion campaign image with layered fabric, clean daylight, and a pale set.')
                 ->where('category', Prompt::CATEGORY_FASHION)
                 ->where('copy_count', 12)
+                ->where('source_label', $prompt->user->name)
+                ->where('model_label', 'Claude Sonnet 4')
                 ->etc()));
 });
 
@@ -438,8 +482,13 @@ test('the prompt generation job fails clearly when ai credentials are missing', 
 test('completed prompt detail exposes copyable prompt text', function (): void {
     $prompt = Prompt::factory()->create([
         'prompt' => 'Create a detailed fashion editorial image.',
+        'category' => Prompt::CATEGORY_FASHION,
         'status' => Prompt::STATUS_COMPLETED,
         'copy_count' => 3,
+    ]);
+    $related = Prompt::factory()->create([
+        'category' => Prompt::CATEGORY_FASHION,
+        'status' => Prompt::STATUS_COMPLETED,
     ]);
 
     $this->get("/prompts/{$prompt->id}")
@@ -448,7 +497,11 @@ test('completed prompt detail exposes copyable prompt text', function (): void {
             ->component('prompts/show')
             ->where('promptItem.id', $prompt->id)
             ->where('promptItem.prompt', 'Create a detailed fashion editorial image.')
-            ->where('promptItem.copy_count', 3));
+            ->where('promptItem.copy_count', 3)
+            ->where('promptItem.model_label', 'Gpt 5.4')
+            ->where('categoryCounts.fashion', 2)
+            ->has('relatedPrompts', 1)
+            ->where('relatedPrompts.0.id', $related->id));
 });
 
 test('incomplete prompts are hidden from public detail routes', function (): void {

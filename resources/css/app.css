@@ -59,6 +59,22 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
+
+    --color-lumen-obsidian: var(--lumen-obsidian);
+    --color-lumen-panel: var(--lumen-panel);
+    --color-lumen-surface: var(--lumen-surface);
+    --color-lumen-hover: var(--lumen-hover);
+    --color-lumen-line: var(--lumen-line);
+    --color-lumen-line-strong: var(--lumen-line-strong);
+    --color-lumen-text: var(--lumen-text);
+    --color-lumen-soft: var(--lumen-soft);
+    --color-lumen-muted: var(--lumen-muted);
+    --color-lumen-primary: var(--lumen-primary);
+    --color-lumen-primary-bright: var(--lumen-primary-bright);
+    --color-lumen-accent: var(--lumen-accent);
+    --color-lumen-premium: var(--lumen-premium);
+    --shadow-lumen-card: 0 24px 80px rgb(0 0 0 / 0.32);
+    --shadow-lumen-glow: 0 0 42px rgb(139 92 246 / 0.22);
 }
 
 :root {
@@ -95,6 +111,20 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.87 0 0);
+
+    --lumen-obsidian: #06070b;
+    --lumen-panel: #0b0d14;
+    --lumen-surface: #11141d;
+    --lumen-hover: #171b27;
+    --lumen-line: rgb(255 255 255 / 0.08);
+    --lumen-line-strong: rgb(255 255 255 / 0.15);
+    --lumen-text: #f7f8fc;
+    --lumen-soft: #a7adbd;
+    --lumen-muted: #747b8e;
+    --lumen-primary: #8b5cf6;
+    --lumen-primary-bright: #a78bfa;
+    --lumen-accent: #22d3ee;
+    --lumen-premium: #f472b6;
 }
 
 .dark {
@@ -139,5 +169,75 @@
 
     body {
         @apply bg-background text-foreground;
+    }
+}
+
+@layer utilities {
+    .lumen-grid {
+        background-image:
+            linear-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px),
+            linear-gradient(90deg, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+        background-size: 34px 34px;
+    }
+
+    .lumen-grain {
+        position: relative;
+    }
+
+    .lumen-grain::before {
+        pointer-events: none;
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        content: '';
+        opacity: 0.13;
+        background-image:
+            radial-gradient(circle at 20% 30%, rgb(255 255 255 / 0.18) 0 1px, transparent 1px),
+            radial-gradient(circle at 70% 80%, rgb(255 255 255 / 0.14) 0 1px, transparent 1px);
+        background-size:
+            23px 23px,
+            31px 31px;
+        mix-blend-mode: soft-light;
+    }
+
+    .lumen-scanline {
+        background-image: linear-gradient(90deg, transparent, rgb(34 211 238 / 0.75), rgb(244 114 182 / 0.72), transparent);
+    }
+
+    @keyframes lumen-float {
+        0%,
+        100% {
+            transform: translate3d(0, 0, 0);
+        }
+
+        50% {
+            transform: translate3d(0, -10px, 0);
+        }
+    }
+
+    @keyframes lumen-pulse {
+        0%,
+        100% {
+            opacity: 0.6;
+        }
+
+        50% {
+            opacity: 1;
+        }
+    }
+
+    .motion-safe\:lumen-float {
+        animation: lumen-float 7s ease-in-out infinite;
+    }
+
+    .motion-safe\:lumen-pulse {
+        animation: lumen-pulse 2.8s ease-in-out infinite;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .motion-safe\:lumen-float,
+        .motion-safe\:lumen-pulse {
+            animation: none;
+        }
     }
 }

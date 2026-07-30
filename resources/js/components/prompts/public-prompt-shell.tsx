@@ -1,0 +1,671 @@
+import { Link, router, usePage } from '@inertiajs/react';
+import {
+    ArrowRight,
+    Command,
+    Grid2X2,
+    LayoutDashboard,
+    LogIn,
+    Menu,
+    Search,
+    Sparkles,
+    UserCircle,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
+import PromptController from '@/actions/App/Http/Controllers/PromptController';
+import {
+    buildPromptQuery,
+    categoryLabels,
+    promptLibraryHref,
+} from '@/components/prompts/prompt-library-config';
+import type { CategoryFilter } from '@/components/prompts/prompt-library-config';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from '@/components/ui/sheet';
+import { dashboard, home, login } from '@/routes';
+import type {
+    PromptCategory,
+    PromptLibraryItem,
+    PromptSort,
+    PromptTrend,
+    User,
+} from '@/types';
+
+type Props = {
+    activeCategory?: PromptCategory | null;
+    activeSearch?: string;
+    activeSort?: PromptSort;
+    categories: PromptCategory[];
+    categoryCounts?: Record<PromptCategory, number>;
+    children: ReactNode;
+    suggestedPrompts?: PromptLibraryItem[];
+    totalCompleted?: number;
+    trends?: PromptTrend[];
+};
+
+const navigationItems = [
+    { label: 'Discover', href: home() },
+    { label: 'Collections', href: `${home.url()}#collections` },
+    { label: 'Categories', href: `${home.url()}#categories` },
+    { label: 'AI Models', href: `${home.url()}#models` },
+];
+
+export function PublicPromptShell({
+    activeCategory = null,
+    activeSearch = '',
+    activeSort = 'newest',
+    categories,
+    categoryCounts = {} as Record<PromptCategory, number>,
+    children,
+    suggestedPrompts = [],
+    totalCompleted = 0,
+    trends = [],
+}: Props) {
+    const { auth } = usePage<{ auth: { user: User | null } }>().props;
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [dialogSearch, setDialogSearch] = useState(activeSearch);
+    const categoryFilter: CategoryFilter = activeCategory ?? 'all';
+    const previewPrompts = suggestedPrompts.filter((prompt) => {
+        if (dialogSearch.trim() === '') {
+            return true;
+        }
+
+        const query = dialogSearch.toLowerCase();
+
+        return [
+            prompt.title,
+            prompt.prompt_preview,
+            prompt.category ? categoryLabels[prompt.category] : '',
+        ]
+            .join(' ')
+            .toLowerCase()
+            .includes(query);
+    });
+
+    useEffect(() => {
+        const openSearch = (event: KeyboardEvent): void => {
+            if (
+                (event.metaKey || event.ctrlKey) &&
+                event.key.toLowerCase() === 'k'
+            ) {
+                event.preventDefault();
+                setDialogSearch(activeSearch);
+                setSearchOpen(true);
+            }
+        };
+
+        window.addEventListener('keydown', openSearch);
+
+        return () => window.removeEventListener('keydown', openSearch);
+    }, [activeSearch]);
+
+    const submitSearch = (event: FormEvent<HTMLFormElement>): void => {
+        event.preventDefault();
+        router.get(
+            home.url({
+                query: buildPromptQuery(
+                    dialogSearch,
+                    categoryFilter,
+                    activeSort,
+                ),
+            }),
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+                replace: true,
+            },
+        );
+        setSearchOpen(false);
+    };
+
+    return (
+        <div className="min-h-screen overflow-x-hidden bg-lumen-obsidian text-lumen-text selection:bg-lumen-primary/[0.35] selection:text-white">
+            <div className="pointer-events-none fixed inset-0 z-0 opacity-45">
+                <div className="absolute inset-0 lumen-grid" />
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgb(139_92_246_/_0.18),transparent_38%),radial-gradient(ellipse_at_bottom_right,rgb(34_211_238_/_0.12),transparent_35%)]" />
+            </div>
+
+            <header className="sticky top-0 z-50 border-b border-lumen-line bg-lumen-obsidian/[0.82] shadow-[0_16px_50px_rgb(0_0_0_/_0.26)] backdrop-blur-2xl supports-[backdrop-filter]:bg-lumen-obsidian/[0.72]">
+                <div className="mx-auto max-w-[1760px] px-4 py-3 sm:px-6 lg:px-8">
+                    <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 xl:grid-cols-[auto_auto_minmax(24rem,1fr)_auto]">
+                        <BrandMark compact={false} />
+
+                        <nav
+                            aria-label="Primary navigation"
+                            className="hidden min-w-0 items-center gap-1 rounded-full border border-lumen-line bg-white/[0.04] p-1 xl:flex"
+                        >
+                            {navigationItems.map((item) =>
+                                typeof item.href === 'string' ? (
+                                    <a
+                                        key={item.label}
+                                        href={item.href}
+                                        className="rounded-full px-3.5 py-2 text-sm font-medium text-lumen-soft transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lumen-accent"
+                                    >
+                                        {item.label}
+                                    </a>
+                                ) : (
+                                    <Link
+                                        key={item.label}
+                                        href={item.href}
+                                        className="rounded-full px-3.5 py-2 text-sm font-medium text-lumen-soft transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lumen-accent"
+                                        preserveScroll
+                                    >
+                                        {item.label}
+                                    </Link>
+                                ),
+                            )}
+                        </nav>
+
+                        <Dialog
+                            open={searchOpen}
+                            onOpenChange={(open) => {
+                                setSearchOpen(open);
+
+                                if (open) {
+                                    setDialogSearch(activeSearch);
+                                }
+                            }}
+                        >
+                            <DialogTrigger asChild>
+                                <button
+                                    type="button"
+                                    className="hidden h-12 min-w-0 items-center justify-between gap-3 rounded-full border border-lumen-line bg-white/[0.06] px-4 text-left text-sm text-lumen-muted shadow-[inset_0_1px_0_rgb(255_255_255_/_0.06)] transition hover:border-lumen-line-strong hover:bg-white/[0.09] hover:text-lumen-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lumen-accent md:flex"
+                                >
+                                    <span className="flex min-w-0 items-center gap-3">
+                                        <Search className="size-4 shrink-0 text-lumen-accent" />
+                                        <span className="truncate">
+                                            Search prompts, styles, creators...
+                                        </span>
+                                    </span>
+                                    <kbd className="hidden rounded-md border border-lumen-line bg-lumen-panel px-2 py-1 font-mono text-[11px] text-lumen-soft lg:inline-flex">
+                                        Ctrl K
+                                    </kbd>
+                                </button>
+                            </DialogTrigger>
+                            <SearchDialog
+                                activeCategory={categoryFilter}
+                                activeSort={activeSort}
+                                dialogSearch={dialogSearch}
+                                previewPrompts={previewPrompts}
+                                setDialogSearch={setDialogSearch}
+                                submitSearch={submitSearch}
+                                trends={trends}
+                            />
+                        </Dialog>
+
+                        <div className="flex min-w-0 items-center justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-11 w-11 shrink-0 rounded-full border-lumen-line bg-white/[0.06] text-lumen-text hover:bg-white/[0.12] hover:text-white md:hidden"
+                                onClick={() => setSearchOpen(true)}
+                                title="Search prompts"
+                            >
+                                <Search />
+                                <span className="sr-only">Search prompts</span>
+                            </Button>
+
+                            <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                className="hidden h-11 rounded-full border-lumen-line bg-white/[0.06] text-lumen-text hover:bg-white/[0.12] hover:text-white lg:inline-flex"
+                            >
+                                <Link href={PromptController.index()}>
+                                    <Grid2X2 />
+                                    Prompt Library
+                                </Link>
+                            </Button>
+                            <Button
+                                asChild
+                                size="sm"
+                                className="hidden h-11 rounded-full bg-lumen-text px-4 text-lumen-obsidian shadow-[0_12px_32px_rgb(247_248_252_/_0.15)] hover:bg-white lg:inline-flex"
+                            >
+                                <Link href={auth.user ? dashboard() : login()}>
+                                    {auth.user ? (
+                                        <>
+                                            <LayoutDashboard />
+                                            Dashboard
+                                        </>
+                                    ) : (
+                                        <>
+                                            <LogIn />
+                                            Login
+                                        </>
+                                    )}
+                                </Link>
+                            </Button>
+
+                            <Sheet>
+                                <SheetTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-11 w-11 shrink-0 rounded-full border-lumen-line bg-white/[0.06] text-lumen-text hover:bg-white/[0.12] hover:text-white xl:hidden"
+                                        title="Open navigation"
+                                    >
+                                        <Menu />
+                                        <span className="sr-only">
+                                            Open navigation
+                                        </span>
+                                    </Button>
+                                </SheetTrigger>
+                                <MobileNavigation
+                                    activeCategory={categoryFilter}
+                                    activeSearch={activeSearch}
+                                    activeSort={activeSort}
+                                    authUser={auth.user}
+                                    categories={categories}
+                                    categoryCounts={categoryCounts}
+                                    totalCompleted={totalCompleted}
+                                />
+                            </Sheet>
+                        </div>
+                    </div>
+
+                    <div className="mt-3 flex gap-2 overflow-x-auto pb-1 xl:hidden">
+                        <CategoryPill
+                            active={categoryFilter === 'all'}
+                            count={totalCompleted}
+                            href={promptLibraryHref(
+                                activeSearch,
+                                'all',
+                                activeSort,
+                            )}
+                            label="All"
+                        />
+                        {categories.map((category) => (
+                            <CategoryPill
+                                key={category}
+                                active={categoryFilter === category}
+                                count={categoryCounts[category] ?? 0}
+                                href={promptLibraryHref(
+                                    activeSearch,
+                                    category,
+                                    activeSort,
+                                )}
+                                label={categoryLabels[category]}
+                            />
+                        ))}
+                    </div>
+                </div>
+                <div className="h-px w-full lumen-scanline opacity-80" />
+            </header>
+
+            <main className="relative z-10">{children}</main>
+
+            <footer className="relative z-10 border-t border-lumen-line bg-lumen-panel/[0.72]">
+                <div className="mx-auto grid max-w-[1760px] gap-6 px-4 py-8 sm:px-6 md:grid-cols-[minmax(0,1fr)_auto] lg:px-8">
+                    <div className="max-w-xl space-y-3">
+                        <BrandMark compact />
+                        <p className="text-sm leading-6 text-lumen-soft">
+                            Discover prompts that turn ideas into extraordinary
+                            images.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-lumen-muted md:justify-end">
+                        <Link
+                            href={home()}
+                            className="rounded-full px-3 py-2 transition hover:bg-white/[0.08] hover:text-white"
+                        >
+                            Discover
+                        </Link>
+                        <Link
+                            href={PromptController.index()}
+                            className="rounded-full px-3 py-2 transition hover:bg-white/[0.08] hover:text-white"
+                        >
+                            Prompts
+                        </Link>
+                        <Link
+                            href={auth.user ? dashboard() : login()}
+                            className="rounded-full px-3 py-2 transition hover:bg-white/[0.08] hover:text-white"
+                        >
+                            {auth.user ? 'Dashboard' : 'Login'}
+                        </Link>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    );
+}
+
+function BrandMark({ compact }: { compact: boolean }) {
+    return (
+        <Link
+            href={home()}
+            className="flex min-w-0 items-center gap-3 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lumen-accent"
+        >
+            <span className="relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-2xl border border-lumen-line-strong bg-lumen-surface text-lumen-text shadow-lumen-glow">
+                <span className="absolute inset-0 bg-[conic-gradient(from_120deg,rgb(139_92_246_/_0.65),rgb(34_211_238_/_0.45),rgb(244_114_182_/_0.5),rgb(139_92_246_/_0.65))] opacity-55" />
+                <Sparkles className="relative size-5" />
+            </span>
+            {!compact && (
+                <span className="hidden min-w-0 sm:block">
+                    <span className="block truncate text-base font-semibold leading-5 text-white">
+                        Prompt Library
+                    </span>
+                    <span className="block truncate text-[11px] font-semibold uppercase text-lumen-muted">
+                        Creative prompt archive
+                    </span>
+                </span>
+            )}
+        </Link>
+    );
+}
+
+function SearchDialog({
+    activeCategory,
+    activeSort,
+    dialogSearch,
+    previewPrompts,
+    setDialogSearch,
+    submitSearch,
+    trends,
+}: {
+    activeCategory: CategoryFilter;
+    activeSort: PromptSort;
+    dialogSearch: string;
+    previewPrompts: PromptLibraryItem[];
+    setDialogSearch: (value: string) => void;
+    submitSearch: (event: FormEvent<HTMLFormElement>) => void;
+    trends: PromptTrend[];
+}) {
+    return (
+        <DialogContent className="max-h-[min(90vh,46rem)] overflow-hidden border-lumen-line-strong bg-lumen-panel/[0.96] p-0 text-lumen-text shadow-lumen-card backdrop-blur-2xl sm:max-w-3xl">
+            <DialogHeader className="border-b border-lumen-line p-4 text-left sm:p-5">
+                <DialogTitle className="flex items-center gap-2 text-lg">
+                    <Command className="size-5 text-lumen-accent" />
+                    Search prompt library
+                </DialogTitle>
+                <DialogDescription className="text-lumen-soft">
+                    Find reusable visual recipes by category, style, title, or
+                    prompt language.
+                </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={submitSearch} className="border-b border-lumen-line p-4 sm:p-5">
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <div className="relative min-w-0">
+                        <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-lumen-accent" />
+                        <Input
+                            value={dialogSearch}
+                            onChange={(event) =>
+                                setDialogSearch(event.target.value)
+                            }
+                            autoFocus
+                            className="h-12 rounded-full border-lumen-line bg-white/[0.06] pl-11 text-lumen-text placeholder:text-lumen-muted focus-visible:ring-lumen-accent/[0.40]"
+                            placeholder="Search cinematic portraits, product photos, anime styles..."
+                        />
+                    </div>
+                    <Button
+                        type="submit"
+                        className="h-12 rounded-full bg-lumen-primary px-5 text-white hover:bg-lumen-primary-bright"
+                    >
+                        Search
+                        <ArrowRight />
+                    </Button>
+                </div>
+            </form>
+
+            <div className="max-h-[28rem] overflow-y-auto p-4 sm:p-5">
+                {trends.length > 0 && (
+                    <div className="mb-5">
+                        <p className="mb-2 text-xs font-semibold uppercase text-lumen-muted">
+                            Trending searches
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            {trends.map((trend) => (
+                                <Link
+                                    key={`${trend.label}-${trend.category ?? trend.search}`}
+                                    href={home({
+                                        query: buildPromptQuery(
+                                            trend.search,
+                                            trend.category ?? activeCategory,
+                                            activeSort,
+                                        ),
+                                    })}
+                                    className="rounded-full border border-lumen-line bg-white/[0.06] px-3 py-2 text-sm text-lumen-soft transition hover:border-lumen-accent/[0.40] hover:bg-lumen-accent/[0.10] hover:text-lumen-text"
+                                    preserveScroll
+                                    preserveState
+                                >
+                                    {trend.label}
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div>
+                    <p className="mb-2 text-xs font-semibold uppercase text-lumen-muted">
+                        Instant preview
+                    </p>
+                    {previewPrompts.length > 0 ? (
+                        <div className="grid gap-2">
+                            {previewPrompts.slice(0, 5).map((prompt) => (
+                                <Link
+                                    key={prompt.id}
+                                    href={PromptController.show(prompt.id)}
+                                    className="grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-lumen-line bg-white/[0.04] p-2 transition hover:border-lumen-line-strong hover:bg-white/[0.08]"
+                                    prefetch
+                                >
+                                    <img
+                                        src={prompt.thumbnail_url}
+                                        alt={prompt.title}
+                                        className="aspect-square rounded-xl object-cover"
+                                        loading="lazy"
+                                    />
+                                    <span className="min-w-0">
+                                        <span className="line-clamp-1 text-sm font-semibold text-lumen-text">
+                                            {prompt.title}
+                                        </span>
+                                        <span className="line-clamp-1 text-xs text-lumen-muted">
+                                            {prompt.prompt_preview}
+                                        </span>
+                                    </span>
+                                    <ArrowRight className="size-4 text-lumen-muted" />
+                                </Link>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl border border-dashed border-lumen-line bg-white/[0.035] p-6 text-center text-sm text-lumen-muted">
+                            No prompt preview matches this search yet.
+                        </div>
+                    )}
+                </div>
+            </div>
+        </DialogContent>
+    );
+}
+
+function MobileNavigation({
+    activeCategory,
+    activeSearch,
+    activeSort,
+    authUser,
+    categories,
+    categoryCounts,
+    totalCompleted,
+}: {
+    activeCategory: CategoryFilter;
+    activeSearch: string;
+    activeSort: PromptSort;
+    authUser: User | null;
+    categories: PromptCategory[];
+    categoryCounts: Record<PromptCategory, number>;
+    totalCompleted: number;
+}) {
+    return (
+        <SheetContent className="w-[min(92vw,24rem)] border-lumen-line bg-lumen-panel p-0 text-lumen-text">
+            <SheetHeader className="border-b border-lumen-line p-5">
+                <SheetTitle className="text-lumen-text">
+                    Browse prompts
+                </SheetTitle>
+            </SheetHeader>
+
+            <div className="grid gap-6 overflow-y-auto p-5">
+                <div className="grid gap-2">
+                    <p className="text-xs font-semibold uppercase text-lumen-muted">
+                        Navigation
+                    </p>
+                    {navigationItems.map((item) =>
+                        typeof item.href === 'string' ? (
+                            <a
+                                key={item.label}
+                                href={item.href}
+                                className="rounded-2xl border border-lumen-line bg-white/[0.04] px-4 py-3 text-sm font-semibold text-lumen-soft"
+                            >
+                                {item.label}
+                            </a>
+                        ) : (
+                            <Link
+                                key={item.label}
+                                href={item.href}
+                                className="rounded-2xl border border-lumen-line bg-white/[0.04] px-4 py-3 text-sm font-semibold text-lumen-soft"
+                                preserveScroll
+                            >
+                                {item.label}
+                            </Link>
+                        ),
+                    )}
+                </div>
+
+                <div className="grid gap-2">
+                    <p className="text-xs font-semibold uppercase text-lumen-muted">
+                        Categories
+                    </p>
+                    <CategoryRow
+                        active={activeCategory === 'all'}
+                        count={totalCompleted}
+                        href={promptLibraryHref(
+                            activeSearch,
+                            'all',
+                            activeSort,
+                        )}
+                        label="All prompts"
+                    />
+                    {categories.map((category) => (
+                        <CategoryRow
+                            key={category}
+                            active={activeCategory === category}
+                            count={categoryCounts[category] ?? 0}
+                            href={promptLibraryHref(
+                                activeSearch,
+                                category,
+                                activeSort,
+                            )}
+                            label={categoryLabels[category]}
+                        />
+                    ))}
+                </div>
+
+                <div className="grid gap-2">
+                    <Button
+                        asChild
+                        variant="outline"
+                        className="h-11 rounded-full border-lumen-line bg-white/[0.06] text-lumen-text hover:bg-white/[0.12] hover:text-white"
+                    >
+                        <Link href={PromptController.index()}>
+                            <Grid2X2 />
+                            Prompt Library
+                        </Link>
+                    </Button>
+                    <Button
+                        asChild
+                        className="h-11 rounded-full bg-lumen-text text-lumen-obsidian hover:bg-white"
+                    >
+                        <Link href={authUser ? dashboard() : login()}>
+                            {authUser ? (
+                                <>
+                                    <UserCircle />
+                                    Dashboard
+                                </>
+                            ) : (
+                                <>
+                                    <LogIn />
+                                    Login
+                                </>
+                            )}
+                        </Link>
+                    </Button>
+                </div>
+            </div>
+        </SheetContent>
+    );
+}
+
+function CategoryPill({
+    active,
+    count,
+    href,
+    label,
+}: {
+    active: boolean;
+    count: number;
+    href: ReturnType<typeof home>;
+    label: string;
+}) {
+    return (
+        <Link
+            href={href}
+            className={
+                active
+                    ? 'inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-lumen-primary/[0.45] bg-lumen-primary/[0.20] px-3.5 text-sm font-semibold text-white'
+                    : 'inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-lumen-line bg-white/[0.05] px-3.5 text-sm font-semibold text-lumen-soft transition hover:border-lumen-line-strong hover:bg-white/[0.08] hover:text-white'
+            }
+            preserveScroll
+            preserveState
+        >
+            {label}
+            <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[11px] text-lumen-muted">
+                {count}
+            </span>
+        </Link>
+    );
+}
+
+function CategoryRow({
+    active,
+    count,
+    href,
+    label,
+}: {
+    active: boolean;
+    count: number;
+    href: ReturnType<typeof home>;
+    label: string;
+}) {
+    return (
+        <Link
+            href={href}
+            className={
+                active
+                    ? 'flex items-center justify-between gap-3 rounded-2xl border border-lumen-primary/[0.45] bg-lumen-primary/[0.18] px-4 py-3 text-sm font-semibold text-white'
+                    : 'flex items-center justify-between gap-3 rounded-2xl border border-lumen-line bg-white/[0.04] px-4 py-3 text-sm font-semibold text-lumen-soft transition hover:bg-white/[0.08] hover:text-white'
+            }
+            preserveScroll
+            preserveState
+        >
+            <span>{label}</span>
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-lumen-muted">
+                {count}
+            </span>
+        </Link>
+    );
+}

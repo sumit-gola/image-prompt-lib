@@ -1,14 +1,25 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import {
     ArrowLeft,
     Check,
     Copy,
-    LayoutDashboard,
-    LogIn,
+    Eye,
     Share2,
     Sparkles,
 } from 'lucide-react';
 import PromptController from '@/actions/App/Http/Controllers/PromptController';
+import { PromptCard } from '@/components/prompts/prompt-card';
+import {
+    categoryBadgeClasses,
+    categoryLabels,
+    formatCount,
+    formatGeneratedDate,
+} from '@/components/prompts/prompt-library-config';
+import {
+    PromptTextPanel,
+    StyleNotesPanel,
+} from '@/components/prompts/prompt-text-panel';
+import { PublicPromptShell } from '@/components/prompts/public-prompt-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,42 +28,29 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { usePromptActions } from '@/hooks/use-prompt-actions';
-import { dashboard, home, login } from '@/routes';
+import { home } from '@/routes';
 import type {
     PromptCategory,
     PromptLibraryItem,
-    PromptStyleNotes,
-    User,
 } from '@/types';
-
-const categoryLabels: Record<PromptCategory, string> = {
-    portrait: 'Portrait',
-    product: 'Product',
-    fashion: 'Fashion',
-    lifestyle: 'Lifestyle',
-    art: 'Art',
-    other: 'Other',
-};
-
-const categoryThemes: Record<PromptCategory, string> = {
-    portrait:
-        'border-[#d85b37]/25 bg-[#d85b37]/10 text-[#87361f] dark:text-[#ffb49d]',
-    product:
-        'border-[#0f8f8a]/25 bg-[#0f8f8a]/10 text-[#075d5a] dark:text-[#82e6df]',
-    fashion:
-        'border-[#8f6bff]/25 bg-[#8f6bff]/10 text-[#5640a8] dark:text-[#c8baff]',
-    lifestyle:
-        'border-[#d7a928]/30 bg-[#d7a928]/12 text-[#765909] dark:text-[#f3d774]',
-    art: 'border-[#2f6fb6]/25 bg-[#2f6fb6]/10 text-[#1f4f86] dark:text-[#9ccaff]',
-    other: 'border-neutral-300 bg-neutral-100 text-neutral-700 dark:border-white/15 dark:bg-white/10 dark:text-neutral-200',
-};
 
 type Props = {
     promptItem: PromptLibraryItem;
+    categories: PromptCategory[];
+    categoryCounts: Record<PromptCategory, number>;
+    relatedPrompts: PromptLibraryItem[];
 };
 
-export default function PromptShow({ promptItem }: Props) {
-    const { auth } = usePage<{ auth: { user: User | null } }>().props;
+export default function PromptShow({
+    promptItem,
+    categories,
+    categoryCounts,
+    relatedPrompts,
+}: Props) {
+    const totalCompleted = Object.values(categoryCounts).reduce(
+        (sum, count) => sum + count,
+        0,
+    );
     const {
         copiedValue,
         copyCount,
@@ -71,151 +69,134 @@ export default function PromptShow({ promptItem }: Props) {
 
     return (
         <>
-            <Head title={promptItem.title} />
+            <Head>
+                <title>{promptItem.title}</title>
+                <meta
+                    head-key="description"
+                    name="description"
+                    content={promptItem.prompt_preview}
+                />
+            </Head>
 
-            <div className="min-h-screen overflow-x-hidden bg-[#eef1ed] text-[#11120f] dark:bg-[#070807] dark:text-white">
-                <header className="sticky top-0 z-40 border-b border-black/10 bg-[#11120f] text-white shadow-[0_14px_40px_rgba(17,18,15,0.22)]">
-                    <div className="mx-auto flex max-w-[1580px] items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+            <PublicPromptShell
+                activeCategory={promptItem.category}
+                activeSort="newest"
+                categories={categories}
+                categoryCounts={categoryCounts}
+                suggestedPrompts={relatedPrompts}
+                totalCompleted={totalCompleted}
+                trends={[]}
+            >
+                <div className="mx-auto max-w-[1760px] px-4 py-6 pb-28 sm:px-6 lg:px-8 lg:py-8 lg:pb-12">
+                    <nav
+                        aria-label="Breadcrumb"
+                        className="mb-5 flex flex-wrap items-center gap-2 text-sm text-lumen-muted"
+                    >
                         <Link
                             href={home()}
-                            className="flex min-w-0 flex-1 items-center gap-3 sm:flex-none"
+                            className="inline-flex items-center gap-2 rounded-full border border-lumen-line bg-white/[0.05] px-3 py-2 transition hover:bg-white/[0.08] hover:text-white"
                         >
-                            <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[#f3efe5] text-[#11120f] shadow-[inset_0_-2px_0_rgba(0,0,0,0.18)]">
-                                <Sparkles className="size-5" />
-                            </span>
-                            <span className="min-w-0">
-                                <span className="block truncate text-lg font-semibold leading-5">
-                                    Prompt Library
-                                </span>
-                                <span className="hidden truncate text-[11px] font-semibold uppercase text-white/48 sm:block">
-                                    Prompt detail
-                                </span>
-                            </span>
+                            <ArrowLeft className="size-4" />
+                            Prompt Library
                         </Link>
+                        <span>/</span>
+                        <span className="line-clamp-1 text-lumen-soft">
+                            {promptItem.title}
+                        </span>
+                    </nav>
 
-                        <div className="ml-auto flex items-center gap-2">
-                            <Button
-                                asChild
-                                variant="outline"
-                                size="sm"
-                                className="h-10 rounded-lg border-white/12 bg-white/7 text-white hover:bg-white hover:text-[#11120f]"
-                            >
-                                <Link href={PromptController.index()}>
-                                    Library
-                                </Link>
-                            </Button>
-                            <Button
-                                asChild
-                                size="sm"
-                                className="h-10 rounded-lg bg-white text-[#11120f] hover:bg-[#f3efe5]"
-                            >
-                                <Link href={auth.user ? dashboard() : login()}>
-                                    {auth.user ? (
-                                        <>
-                                            <LayoutDashboard />
-                                            <span className="hidden sm:inline">
-                                                Dashboard
-                                            </span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <LogIn />
-                                            <span className="hidden sm:inline">
-                                                Login
-                                            </span>
-                                        </>
-                                    )}
-                                </Link>
-                            </Button>
-                        </div>
-                    </div>
-                </header>
-
-                <main className="mx-auto max-w-[1580px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-                    <div className="mb-5">
-                        <Button
-                            asChild
-                            variant="ghost"
-                            size="sm"
-                            className="rounded-lg"
-                        >
-                            <Link href={home()} prefetch>
-                                <ArrowLeft />
-                                Back to prompts
-                            </Link>
-                        </Button>
-                    </div>
-
-                    <div className="grid gap-6 xl:grid-cols-[minmax(20rem,0.82fr)_minmax(0,1.18fr)]">
+                    <div className="grid gap-6 xl:grid-cols-[minmax(22rem,0.9fr)_minmax(0,1.1fr)]">
                         <section className="space-y-4">
-                            <div className="overflow-hidden rounded-lg border border-[#cdd4cd] bg-[#fbfbf6] shadow-[0_24px_56px_rgba(17,18,15,0.14)] dark:border-white/10 dark:bg-white/7 dark:shadow-none">
-                                <div className="relative">
-                                    <img
-                                        src={promptItem.reference_image_url}
-                                        alt={promptItem.title}
-                                        className="aspect-[4/5] w-full object-cover sm:aspect-[5/6] xl:aspect-[4/5]"
-                                    />
-                                    <div className="absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-2 p-3">
-                                        {promptItem.category && (
-                                            <Badge
-                                                variant="outline"
-                                                className={`bg-white/92 shadow-sm backdrop-blur dark:bg-[#11120f]/90 ${categoryThemes[promptItem.category]}`}
-                                            >
-                                                {
-                                                    categoryLabels[
-                                                        promptItem.category
-                                                    ]
-                                                }
-                                            </Badge>
-                                        )}
-                                        <Badge className="ml-auto bg-[#11120f]/90 text-white shadow-sm backdrop-blur">
-                                            Reference image
+                            <div className="relative overflow-hidden rounded-[1.75rem] border border-lumen-line bg-lumen-panel shadow-lumen-card">
+                                <img
+                                    src={promptItem.reference_image_url}
+                                    alt={promptItem.title}
+                                    className="aspect-[4/5] w-full object-cover md:aspect-[16/13] xl:aspect-[4/5]"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-lumen-obsidian via-transparent to-transparent opacity-80" />
+                                <div className="absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-2 p-4">
+                                    {promptItem.category && (
+                                        <Badge
+                                            variant="outline"
+                                            className={`rounded-full backdrop-blur-xl ${categoryBadgeClasses[promptItem.category]}`}
+                                        >
+                                            {
+                                                categoryLabels[
+                                                    promptItem.category
+                                                ]
+                                            }
                                         </Badge>
+                                    )}
+                                    <Badge className="ml-auto rounded-full border-lumen-line bg-lumen-obsidian/[0.74] text-lumen-soft backdrop-blur-xl">
+                                        <Eye className="size-3.5" />
+                                        Reference image
+                                    </Badge>
+                                </div>
+                                <div className="absolute inset-x-0 bottom-0 p-5">
+                                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-lumen-soft">
+                                        <span>
+                                            {formatGeneratedDate(
+                                                promptItem.generated_at,
+                                            )}
+                                        </span>
+                                        {promptItem.model_label && (
+                                            <>
+                                                <span className="text-lumen-muted">
+                                                    /
+                                                </span>
+                                                <span className="font-mono text-lumen-accent">
+                                                    {promptItem.model_label}
+                                                </span>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>
 
                             {promptItem.style_notes && (
-                                <StyleNotes notes={promptItem.style_notes} />
+                                <StyleNotesPanel notes={promptItem.style_notes} />
                             )}
                         </section>
 
-                        <section className="space-y-4">
-                            <div className="rounded-lg border border-[#cdd4cd] bg-[#fbfbf6] p-4 shadow-[0_1px_0_rgba(17,18,15,0.06),0_16px_34px_rgba(17,18,15,0.08)] sm:p-5 dark:border-white/10 dark:bg-white/7 dark:shadow-none">
-                                <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-                                    <div className="min-w-0 space-y-4">
-                                        <div className="flex flex-wrap items-center gap-2">
+                        <section className="space-y-4 xl:sticky xl:top-28 xl:self-start">
+                            <div className="overflow-hidden rounded-[1.75rem] border border-lumen-line bg-lumen-panel/[0.88] text-lumen-text shadow-lumen-card backdrop-blur">
+                                <div className="h-px w-full lumen-scanline" />
+                                <div className="space-y-6 p-5 sm:p-6 lg:p-7">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <Badge className="rounded-full border-lumen-primary/[0.35] bg-lumen-primary/[0.14] text-lumen-primary-bright">
+                                            <Sparkles />
+                                            Prompt sheet
+                                        </Badge>
+                                        <Badge
+                                            variant="outline"
+                                            className="rounded-full border-lumen-line bg-white/[0.05] text-lumen-soft"
+                                        >
+                                            <Copy className="size-3.5" />
+                                            {formatCount(copyCount)} copied
+                                        </Badge>
+                                        {promptItem.source_label && (
                                             <Badge
                                                 variant="outline"
-                                                className="border-[#11120f] bg-[#11120f] text-white dark:border-white dark:bg-white dark:text-[#11120f]"
+                                                className="rounded-full border-lumen-line bg-white/[0.05] text-lumen-soft"
                                             >
-                                                Prompt sheet
+                                                {promptItem.source_label}
                                             </Badge>
-                                            <Badge variant="outline">
-                                                {formatGeneratedDate(
-                                                    promptItem.generated_at,
-                                                )}
-                                            </Badge>
-                                            <Badge variant="outline">
-                                                <Copy className="size-3" />
-                                                {formatCount(copyCount)} copied
-                                            </Badge>
-                                        </div>
-
-                                        <div className="space-y-3">
-                                            <h1 className="max-w-4xl text-3xl font-semibold tracking-normal sm:text-4xl">
-                                                {promptItem.title}
-                                            </h1>
-                                            <p className="max-w-3xl border-l-2 border-[#009e91]/60 pl-3 text-sm leading-6 text-[#62675e] dark:text-white/66">
-                                                {promptItem.prompt_preview}
-                                            </p>
-                                        </div>
+                                        )}
                                     </div>
 
-                                    <div className="flex gap-2 lg:justify-end">
+                                    <div className="space-y-3">
+                                        <h1 className="text-balance text-4xl font-semibold leading-none text-white sm:text-5xl">
+                                            {promptItem.title}
+                                        </h1>
+                                        <p className="max-w-3xl border-l-2 border-lumen-accent/[0.65] pl-4 text-sm leading-7 text-lumen-soft sm:text-base">
+                                            {promptItem.prompt_preview}
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-[minmax(0,1fr)_3rem] gap-2 sm:flex sm:flex-wrap">
                                         <Button
                                             type="button"
-                                            className="h-11 flex-1 rounded-lg bg-[#11120f] text-white hover:bg-[#272923] sm:flex-none dark:bg-white dark:text-[#11120f] dark:hover:bg-neutral-200"
+                                            className="h-12 rounded-full bg-lumen-text px-5 text-lumen-obsidian shadow-[0_12px_32px_rgb(247_248_252_/_0.15)] hover:bg-white"
                                             onClick={() => void copyPrompt()}
                                             disabled={promptText === ''}
                                         >
@@ -236,7 +217,7 @@ export default function PromptShow({ promptItem }: Props) {
                                                     variant="outline"
                                                     size="icon"
                                                     title={shareTitle}
-                                                    className="h-11 w-11 rounded-lg bg-white/80 dark:bg-white/7"
+                                                    className="h-12 w-12 rounded-full border-lumen-line bg-white/[0.06] text-lumen-text hover:bg-white/[0.12] hover:text-white"
                                                     onClick={() =>
                                                         void sharePrompt()
                                                     }
@@ -260,7 +241,7 @@ export default function PromptShow({ promptItem }: Props) {
                                 </div>
                             </div>
 
-                            <PromptPanel
+                            <PromptTextPanel
                                 title="Prompt"
                                 value={promptText}
                                 copied={copiedValue === promptText}
@@ -268,7 +249,7 @@ export default function PromptShow({ promptItem }: Props) {
                             />
 
                             {promptItem.negative_prompt && (
-                                <PromptPanel
+                                <PromptTextPanel
                                     title="Negative prompt"
                                     value={promptItem.negative_prompt}
                                     copied={
@@ -284,89 +265,54 @@ export default function PromptShow({ promptItem }: Props) {
                             )}
                         </section>
                     </div>
-                </main>
-            </div>
+
+                    {relatedPrompts.length > 0 && (
+                        <section className="mt-12">
+                            <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                                <div>
+                                    <p className="mb-2 text-xs font-semibold uppercase text-lumen-accent">
+                                        Related prompts
+                                    </p>
+                                    <h2 className="text-3xl font-semibold text-white">
+                                        Continue this visual direction
+                                    </h2>
+                                </div>
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="w-fit rounded-full border-lumen-line bg-white/[0.06] text-lumen-text hover:bg-white/[0.12] hover:text-white"
+                                >
+                                    <Link href={PromptController.index()}>
+                                        View all prompts
+                                    </Link>
+                                </Button>
+                            </div>
+                            <div className="grid grid-cols-1 gap-4 min-[560px]:grid-cols-2 lg:grid-cols-4">
+                                {relatedPrompts.map((prompt) => (
+                                    <PromptCard
+                                        key={prompt.id}
+                                        prompt={prompt}
+                                    />
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-lumen-line bg-lumen-obsidian/[0.88] p-3 backdrop-blur-xl md:hidden">
+                        <Button
+                            type="button"
+                            className="h-12 w-full rounded-full bg-lumen-text text-lumen-obsidian hover:bg-white"
+                            onClick={() => void copyPrompt()}
+                            disabled={promptText === ''}
+                        >
+                            {copiedValue === promptText ? <Check /> : <Copy />}
+                            {copiedValue === promptText
+                                ? 'Copied'
+                                : 'Copy Prompt'}
+                        </Button>
+                    </div>
+                </div>
+            </PublicPromptShell>
         </>
     );
-}
-
-function PromptPanel({
-    copied,
-    onCopy,
-    title,
-    value,
-}: {
-    copied: boolean;
-    onCopy: () => void;
-    title: string;
-    value: string;
-}) {
-    return (
-        <section className="rounded-lg border border-[#cdd4cd] bg-[#fbfbf6] p-4 shadow-[0_1px_0_rgba(17,18,15,0.06),0_16px_34px_rgba(17,18,15,0.08)] sm:p-5 dark:border-white/10 dark:bg-white/7 dark:shadow-none">
-            <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#d2d8d2] pb-3 dark:border-white/10">
-                <h2 className="text-base font-semibold">{title}</h2>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="rounded-lg bg-white/80 dark:bg-white/7"
-                    onClick={onCopy}
-                    disabled={value === ''}
-                >
-                    {copied ? <Check /> : <Copy />}
-                    {copied ? 'Copied' : 'Copy'}
-                </Button>
-            </div>
-            <p className="whitespace-pre-wrap break-words text-sm leading-7 text-[#4f554d] dark:text-white/68">
-                {value}
-            </p>
-        </section>
-    );
-}
-
-function StyleNotes({ notes }: { notes: PromptStyleNotes }) {
-    return (
-        <section className="rounded-lg border border-[#cdd4cd] bg-[#fbfbf6] p-4 shadow-[0_1px_0_rgba(17,18,15,0.06),0_16px_34px_rgba(17,18,15,0.08)] sm:p-5 dark:border-white/10 dark:bg-white/7 dark:shadow-none">
-            <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#d2d8d2] pb-3 dark:border-white/10">
-                <h2 className="text-base font-semibold">Style notes</h2>
-                <span className="text-xs font-semibold uppercase text-[#7b8076] dark:text-white/46">
-                    Visual recipe
-                </span>
-            </div>
-            <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-                {Object.entries(notes).map(([key, value]) => (
-                    <div
-                        key={key}
-                        className="grid min-w-0 gap-1 border-b border-[#d2d8d2] pb-3 last:border-b-0 last:pb-0 sm:border-b-0 sm:border-l sm:pl-3 sm:last:border-l xl:border-b xl:border-l-0 xl:pl-0 xl:last:border-b-0 2xl:border-b-0 2xl:border-l 2xl:pl-3 dark:border-white/10"
-                    >
-                        <dt className="text-xs font-semibold uppercase text-[#7b8076] dark:text-white/46">
-                            {key.replace('_', ' ')}
-                        </dt>
-                        <dd className="break-words text-sm leading-6 text-[#3f453d] dark:text-white/74">
-                            {value}
-                        </dd>
-                    </div>
-                ))}
-            </dl>
-        </section>
-    );
-}
-
-function formatGeneratedDate(value: string | null): string {
-    if (!value) {
-        return 'Recently added';
-    }
-
-    return new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        timeZone: 'UTC',
-    }).format(new Date(value));
-}
-
-function formatCount(value: number): string {
-    return new Intl.NumberFormat('en-US', {
-        notation: value >= 1000 ? 'compact' : 'standard',
-    }).format(value);
 }
