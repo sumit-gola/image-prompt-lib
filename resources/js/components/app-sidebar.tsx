@@ -1,5 +1,8 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import { usePage } from '@inertiajs/react';
+import { BookOpen, FolderGit2, Images, LayoutGrid, Shield } from 'lucide-react';
+import AdminPromptController from '@/actions/App/Http/Controllers/AdminPromptController';
+import PromptController from '@/actions/App/Http/Controllers/PromptController';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -14,15 +17,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import type { NavItem } from '@/types';
-
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
+import type { NavItem, User } from '@/types';
 
 const footerNavItems: NavItem[] = [
     {
@@ -38,6 +33,29 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const { auth } = usePage<{ auth: { user: User | null } }>().props;
+    const mainNavItems: NavItem[] = [
+        {
+            title: 'Dashboard',
+            href: dashboard(),
+            icon: LayoutGrid,
+        },
+        {
+            title: 'Prompt Library',
+            href: PromptController.index(),
+            icon: Images,
+        },
+        ...(auth.user?.is_admin
+            ? [
+                  {
+                      title: 'Admin Prompts',
+                      href: AdminPromptController.index(),
+                      icon: Shield,
+                  },
+              ]
+            : []),
+    ];
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
