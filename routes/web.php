@@ -3,13 +3,19 @@
 use App\Http\Controllers\AdminPromptController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PromptController;
+use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\SeoController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('robots.txt', [SeoController::class, 'robots'])->name('seo.robots');
 Route::get('sitemap.xml', [SeoController::class, 'sitemap'])->name('seo.sitemap');
+Route::get('ads.txt', [SeoController::class, 'adsTxt'])->name('seo.ads-txt');
 
 Route::get('/', [PromptController::class, 'home'])->name('home');
+Route::get('about', [PublicPageController::class, 'about'])->name('about');
+Route::get('contact', [PublicPageController::class, 'contact'])->name('contact');
+Route::get('privacy-policy', [PublicPageController::class, 'privacyPolicy'])->name('privacy-policy');
+Route::get('terms', [PublicPageController::class, 'terms'])->name('terms');
 
 Route::get('prompts', [PromptController::class, 'index'])->name('prompts.index');
 Route::get('prompts/{prompt}', [PromptController::class, 'show'])->name('prompts.show');

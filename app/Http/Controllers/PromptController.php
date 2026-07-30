@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Prompt;
+use App\Support\AdSense;
 use App\Support\PromptSeo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,12 +33,12 @@ class PromptController extends Controller
         self::SORT_CATEGORY,
     ];
 
-    public function home(Request $request, PromptSeo $seo): Response
+    public function home(Request $request, PromptSeo $seo, AdSense $adSense): Response
     {
-        return $this->index($request, $seo);
+        return $this->index($request, $seo, $adSense);
     }
 
-    public function index(Request $request, PromptSeo $seo): Response
+    public function index(Request $request, PromptSeo $seo, AdSense $adSense): Response
     {
         $search = trim((string) $request->string('search'));
         $category = (string) $request->string('category');
@@ -125,6 +126,9 @@ class PromptController extends Controller
             ->map(fn (Prompt $prompt): array => $this->promptData($prompt, $seo))
             ->values();
 
+        $seoData = $seo->forIndex($request, $category, $sort, $prompts->total());
+        $adsAllowed = ($seoData['robots'] ?? '') === 'index,follow' && $prompts->total() > 0;
+
         return Inertia::render('prompts/index', [
             'prompts' => $prompts,
             'categories' => Prompt::CATEGORIES,
@@ -141,7 +145,9 @@ class PromptController extends Controller
             'totalCompleted' => $completedTotal,
             'totalCopies' => $totalCopies,
             'newestCategory' => $newestCategory,
-            'seo' => $seo->forIndex($request, $category, $sort, $prompts->total()),
+            'seo' => $seoData,
+            'adsense' => $adSense->publicConfig($adsAllowed),
+            'adsensePlacement' => $request->routeIs('prompts.index') ? 'library' : 'home',
             'filters' => [
                 'search' => $search,
                 'category' => $category,
@@ -150,7 +156,7 @@ class PromptController extends Controller
         ]);
     }
 
-    public function show(Prompt $prompt, PromptSeo $seo): Response
+    public function show(Prompt $prompt, PromptSeo $seo, AdSense $adSense): Response
     {
         abort_unless($prompt->status === Prompt::STATUS_COMPLETED, 404);
 
@@ -164,6 +170,7 @@ class PromptController extends Controller
             'categoryCounts' => $this->completedCategoryCounts(),
             'relatedPrompts' => $this->relatedPrompts($prompt, $seo),
             'seo' => $seo->forPrompt($prompt, $promptData),
+            'adsense' => $adSense->publicConfig(),
         ]);
     }
 

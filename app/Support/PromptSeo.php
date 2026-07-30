@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 
 class PromptSeo
 {
-    public const SITEMAP_CACHE_KEY = 'prompt-library:sitemap:v1';
+    public const SITEMAP_CACHE_KEY = 'prompt-library:sitemap:v2';
 
     /**
      * @return array<string, mixed>
@@ -142,6 +142,53 @@ class PromptSeo
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function forStaticPage(string $title, string $description, string $routeName): array
+    {
+        $canonicalUrl = route($routeName);
+
+        return [
+            'title' => $title,
+            'description' => $description,
+            'canonical_url' => $canonicalUrl,
+            'robots' => 'index,follow',
+            'open_graph' => [
+                'type' => 'website',
+                'title' => $title,
+                'description' => $description,
+                'url' => $canonicalUrl,
+                'image' => null,
+            ],
+            'twitter' => [
+                'card' => 'summary',
+                'title' => $title,
+                'description' => $description,
+                'image' => null,
+            ],
+            'structured_data' => [
+                $this->websiteSchema(),
+                [
+                    '@context' => 'https://schema.org',
+                    '@type' => 'WebPage',
+                    'name' => $title,
+                    'description' => $description,
+                    'url' => $canonicalUrl,
+                    'isPartOf' => [
+                        '@type' => 'WebSite',
+                        'name' => 'Prompt Library',
+                        'url' => route('home'),
+                    ],
+                ],
+                $this->breadcrumbSchema([
+                    ['name' => 'Prompt Library', 'url' => route('home')],
+                    ['name' => $title, 'url' => $canonicalUrl],
+                ]),
+            ],
+        ];
+    }
+
     public function imageAlt(Prompt $prompt): string
     {
         $subject = is_array($prompt->style_notes)
@@ -169,6 +216,10 @@ class PromptSeo
 
         $this->writeUrl($writer, route('home'), now(), 'daily', '1.0');
         $this->writeUrl($writer, route('prompts.index'), now(), 'daily', '0.9');
+        $this->writeUrl($writer, route('about'), now(), 'monthly', '0.6');
+        $this->writeUrl($writer, route('contact'), now(), 'monthly', '0.6');
+        $this->writeUrl($writer, route('privacy-policy'), now(), 'monthly', '0.5');
+        $this->writeUrl($writer, route('terms'), now(), 'monthly', '0.5');
 
         Prompt::query()
             ->completed()

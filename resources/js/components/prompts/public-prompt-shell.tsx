@@ -44,7 +44,15 @@ import {
 import type { Appearance } from '@/hooks/use-appearance';
 import { useAppearance } from '@/hooks/use-appearance';
 import { cn } from '@/lib/utils';
-import { dashboard, home, login } from '@/routes';
+import {
+    about,
+    contact,
+    dashboard,
+    home,
+    login,
+    privacyPolicy,
+    terms,
+} from '@/routes';
 import type {
     PromptCategory,
     PromptLibraryItem,
@@ -355,6 +363,30 @@ export function PublicPromptShell({
                             className="rounded-full px-3 py-2 transition hover:bg-white hover:text-lumen-text dark:hover:bg-white/[0.08] dark:hover:text-white"
                         >
                             {auth.user ? 'Dashboard' : 'Login'}
+                        </Link>
+                        <Link
+                            href={about()}
+                            className="rounded-full px-3 py-2 transition hover:bg-white hover:text-lumen-text dark:hover:bg-white/[0.08] dark:hover:text-white"
+                        >
+                            About
+                        </Link>
+                        <Link
+                            href={contact()}
+                            className="rounded-full px-3 py-2 transition hover:bg-white hover:text-lumen-text dark:hover:bg-white/[0.08] dark:hover:text-white"
+                        >
+                            Contact
+                        </Link>
+                        <Link
+                            href={privacyPolicy()}
+                            className="rounded-full px-3 py-2 transition hover:bg-white hover:text-lumen-text dark:hover:bg-white/[0.08] dark:hover:text-white"
+                        >
+                            Privacy
+                        </Link>
+                        <Link
+                            href={terms()}
+                            className="rounded-full px-3 py-2 transition hover:bg-white hover:text-lumen-text dark:hover:bg-white/[0.08] dark:hover:text-white"
+                        >
+                            Terms
                         </Link>
                     </div>
                 </div>

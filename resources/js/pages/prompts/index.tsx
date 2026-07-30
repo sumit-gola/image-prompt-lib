@@ -16,6 +16,8 @@ import {
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import PromptController from '@/actions/App/Http/Controllers/PromptController';
+import { ResponsiveAdSlot } from '@/components/ads/ad-slot';
+import { AdSenseScript } from '@/components/ads/adsense-script';
 import { PromptCard } from '@/components/prompts/prompt-card';
 import { PromptImagePlaceholder } from '@/components/prompts/prompt-image-placeholder';
 import {
@@ -37,6 +39,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { home } from '@/routes';
 import type {
+    AdSenseConfig,
+    AdSenseSlotKey,
     Paginated,
     PromptCategory,
     PromptCollectionItem,
@@ -60,6 +64,8 @@ type Props = {
     totalCopies: number;
     newestCategory: PromptCategory | null;
     seo: PromptSeoMeta;
+    adsense: AdSenseConfig;
+    adsensePlacement: Extract<AdSenseSlotKey, 'home' | 'library'>;
     filters: {
         search: string;
         category: PromptCategory | null;
@@ -80,6 +86,8 @@ export default function PromptLibrary({
     totalCopies,
     newestCategory,
     seo,
+    adsense,
+    adsensePlacement,
     filters,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
@@ -121,6 +129,7 @@ export default function PromptLibrary({
     return (
         <>
             <PromptSeoHead seo={seo} />
+            <AdSenseScript config={adsense} />
 
             <PublicPromptShell
                 activeCategory={filters.category}
@@ -144,6 +153,16 @@ export default function PromptLibrary({
                         sort={sort}
                         totalCompleted={totalCompleted}
                         totalCopies={totalCopies}
+                    />
+
+                    <ResponsiveAdSlot
+                        adSlot={
+                            adsense.slots[adsensePlacement] ??
+                            adsense.slots.home ??
+                            adsense.slots.library
+                        }
+                        className="mt-5"
+                        config={adsense}
                     />
 
                     <TrendingSearches

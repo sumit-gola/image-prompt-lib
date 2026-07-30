@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\AdSense;
 use App\Support\PromptSeo;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
@@ -37,6 +38,17 @@ class SeoController extends Controller
         ]);
 
         return response($content, 200, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Cache-Control' => 'public, max-age=3600',
+        ]);
+    }
+
+    public function adsTxt(AdSense $adSense): Response
+    {
+        $content = $adSense->adsTxtLine()
+            ?? '# AdSense publisher ID is not configured yet.';
+
+        return response($content."\n", 200, [
             'Content-Type' => 'text/plain; charset=UTF-8',
             'Cache-Control' => 'public, max-age=3600',
         ]);

@@ -1,6 +1,8 @@
 import { Link } from '@inertiajs/react';
 import { ArrowLeft, Check, Copy, Eye, Share2, Sparkles } from 'lucide-react';
 import PromptController from '@/actions/App/Http/Controllers/PromptController';
+import { ResponsiveAdSlot } from '@/components/ads/ad-slot';
+import { AdSenseScript } from '@/components/ads/adsense-script';
 import { PromptCard } from '@/components/prompts/prompt-card';
 import { PromptImagePlaceholder } from '@/components/prompts/prompt-image-placeholder';
 import {
@@ -24,7 +26,12 @@ import {
 } from '@/components/ui/tooltip';
 import { usePromptActions } from '@/hooks/use-prompt-actions';
 import { home } from '@/routes';
-import type { PromptCategory, PromptLibraryItem, PromptSeoMeta } from '@/types';
+import type {
+    AdSenseConfig,
+    PromptCategory,
+    PromptLibraryItem,
+    PromptSeoMeta,
+} from '@/types';
 
 type Props = {
     promptItem: PromptLibraryItem;
@@ -32,6 +39,7 @@ type Props = {
     categoryCounts: Record<PromptCategory, number>;
     relatedPrompts: PromptLibraryItem[];
     seo: PromptSeoMeta;
+    adsense: AdSenseConfig;
 };
 
 export default function PromptShow({
@@ -40,6 +48,7 @@ export default function PromptShow({
     categoryCounts,
     relatedPrompts,
     seo,
+    adsense,
 }: Props) {
     const totalCompleted = Object.values(categoryCounts).reduce(
         (sum, count) => sum + count,
@@ -66,6 +75,7 @@ export default function PromptShow({
     return (
         <>
             <PromptSeoHead seo={seo} />
+            <AdSenseScript config={adsense} />
 
             <PublicPromptShell
                 activeCategory={promptItem.category}
@@ -270,6 +280,12 @@ export default function PromptShow({
                             )}
                         </section>
                     </div>
+
+                    <ResponsiveAdSlot
+                        adSlot={adsense.slots.detail}
+                        className="mt-8"
+                        config={adsense}
+                    />
 
                     {relatedPrompts.length > 0 && (
                         <section className="mt-12">

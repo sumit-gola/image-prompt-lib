@@ -107,6 +107,15 @@ export type PromptModelCount = {
     count: number;
 };
 
+export type AdSenseSlotKey = 'home' | 'library' | 'detail';
+
+export type AdSenseConfig = {
+    enabled: boolean;
+    client_id: string | null;
+    test_mode: boolean;
+    slots: Record<AdSenseSlotKey, string | null>;
+};
+
 export type AdminPromptItem = PromptLibraryItem & {
     status: PromptStatus;
     source_site: string | null;
