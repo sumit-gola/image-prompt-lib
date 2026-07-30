@@ -1,9 +1,10 @@
 import { Form, Head, Link, router, usePoll } from '@inertiajs/react';
 import {
     AlertCircle,
+    BarChart3,
     Bot,
+    ChevronDown,
     CheckCircle2,
-    Clock3,
     Copy,
     Edit3,
     Eye,
@@ -20,17 +21,22 @@ import {
     WandSparkles,
     X,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import AdminPromptController from '@/actions/App/Http/Controllers/AdminPromptController';
 import PromptController from '@/actions/App/Http/Controllers/PromptController';
 import { PromptImagePlaceholder } from '@/components/prompts/prompt-image-placeholder';
 import { categoryLabels } from '@/components/prompts/prompt-library-config';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
     Dialog,
     DialogContent,
@@ -72,6 +78,14 @@ type SourceSiteFilter = 'local' | 'promptplum';
 
 type BulkAction = 'status' | 'category' | 'retry' | 'delete';
 
+type AdminPerPage = 24 | 48 | 96;
+
+type ActiveFilter = {
+    key: string;
+    label: string;
+    onRemove: () => void;
+};
+
 type Props = {
     prompts: Paginated<AdminPromptItem>;
     statuses: PromptStatus[];
@@ -90,6 +104,7 @@ type Props = {
         generated_from: string | null;
         generated_to: string | null;
         sort: AdminSort;
+        per_page: AdminPerPage;
     };
     summary: PromptStatusSummary;
     aiConfiguration: PromptAiConfiguration;
@@ -124,6 +139,8 @@ const sortLabels: Record<AdminSort, string> = {
     category: 'Category',
     generation_mode: 'Generation mode',
 };
+
+const perPageOptions: AdminPerPage[] = [24, 48, 96];
 
 export default function AdminPrompts({
     prompts,
@@ -161,6 +178,9 @@ export default function AdminPrompts({
     );
     const [generatedTo, setGeneratedTo] = useState(filters.generated_to ?? '');
     const [sort, setSort] = useState<AdminSort>(filters.sort ?? 'newest');
+    const [perPage, setPerPage] = useState<AdminPerPage>(
+        filters.per_page ?? 24,
+    );
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [bulkAction, setBulkAction] = useState<BulkAction>('status');
     const [bulkStatus, setBulkStatus] =
@@ -178,35 +198,6 @@ export default function AdminPrompts({
         { autoStart: requiresPolling },
     );
 
-    const activeFilters = useMemo(
-        () =>
-            [
-                filters.search && `Search: ${filters.search}`,
-                filters.status && `Status: ${statusLabels[filters.status]}`,
-                filters.category &&
-                    `Category: ${categoryLabels[filters.category]}`,
-                filters.generation_mode &&
-                    `Mode: ${generationModeLabels[filters.generation_mode]}`,
-                filters.source_site &&
-                    `Source: ${sourceSiteLabels[filters.source_site]}`,
-                filters.created_from && `Created from ${filters.created_from}`,
-                filters.created_to && `Created to ${filters.created_to}`,
-                filters.generated_from &&
-                    `Generated from ${filters.generated_from}`,
-                filters.generated_to && `Generated to ${filters.generated_to}`,
-                filters.sort !== 'newest' && `Sort: ${sortLabels[filters.sort]}`,
-            ].filter(Boolean) as string[],
-        [filters],
-    );
-
-    const allVisibleSelected =
-        prompts.data.length > 0 &&
-        prompts.data.every((prompt) => selectedIds.includes(prompt.id));
-
-    const visibleSelectedCount = prompts.data.filter((prompt) =>
-        selectedIds.includes(prompt.id),
-    ).length;
-
     const applyFilters = (
         overrides: Partial<{
             search: string;
@@ -219,6 +210,7 @@ export default function AdminPrompts({
             generatedFrom: string;
             generatedTo: string;
             sort: AdminSort;
+            perPage: AdminPerPage;
         }> = {},
     ) => {
         const next = {
@@ -232,6 +224,7 @@ export default function AdminPrompts({
             generatedFrom,
             generatedTo,
             sort,
+            perPage,
             ...overrides,
         };
         const query: Record<string, string> = {};
@@ -276,6 +269,10 @@ export default function AdminPrompts({
             query.sort = next.sort;
         }
 
+        if (next.perPage !== 24) {
+            query.per_page = String(next.perPage);
+        }
+
         router.get(AdminPromptController.index.url(), query, {
             preserveScroll: true,
             preserveState: true,
@@ -300,6 +297,7 @@ export default function AdminPrompts({
         setGeneratedFrom('');
         setGeneratedTo('');
         setSort('newest');
+        setPerPage(24);
         applyFilters({
             search: '',
             status: 'all',
@@ -311,8 +309,120 @@ export default function AdminPrompts({
             generatedFrom: '',
             generatedTo: '',
             sort: 'newest',
+            perPage: 24,
         });
     };
+
+    const activeFilters: ActiveFilter[] = [
+        filters.search
+            ? {
+                  key: 'search',
+                  label: `Search: ${filters.search}`,
+                  onRemove: () => {
+                      setSearch('');
+                      applyFilters({ search: '' });
+                  },
+              }
+            : null,
+        filters.status
+            ? {
+                  key: 'status',
+                  label: `Status: ${statusLabels[filters.status]}`,
+                  onRemove: () => {
+                      setStatus('all');
+                      applyFilters({ status: 'all' });
+                  },
+              }
+            : null,
+        filters.category
+            ? {
+                  key: 'category',
+                  label: `Category: ${categoryLabels[filters.category]}`,
+                  onRemove: () => {
+                      setCategory('all');
+                      applyFilters({ category: 'all' });
+                  },
+              }
+            : null,
+        filters.generation_mode
+            ? {
+                  key: 'generation_mode',
+                  label: `Mode: ${generationModeLabels[filters.generation_mode]}`,
+                  onRemove: () => {
+                      setGenerationMode('all');
+                      applyFilters({ generationMode: 'all' });
+                  },
+              }
+            : null,
+        filters.source_site
+            ? {
+                  key: 'source_site',
+                  label: `Source: ${sourceSiteLabels[filters.source_site]}`,
+                  onRemove: () => {
+                      setSourceSite('all');
+                      applyFilters({ sourceSite: 'all' });
+                  },
+              }
+            : null,
+        filters.created_from
+            ? {
+                  key: 'created_from',
+                  label: `Created from ${filters.created_from}`,
+                  onRemove: () => {
+                      setCreatedFrom('');
+                      applyFilters({ createdFrom: '' });
+                  },
+              }
+            : null,
+        filters.created_to
+            ? {
+                  key: 'created_to',
+                  label: `Created to ${filters.created_to}`,
+                  onRemove: () => {
+                      setCreatedTo('');
+                      applyFilters({ createdTo: '' });
+                  },
+              }
+            : null,
+        filters.generated_from
+            ? {
+                  key: 'generated_from',
+                  label: `Generated from ${filters.generated_from}`,
+                  onRemove: () => {
+                      setGeneratedFrom('');
+                      applyFilters({ generatedFrom: '' });
+                  },
+              }
+            : null,
+        filters.generated_to
+            ? {
+                  key: 'generated_to',
+                  label: `Generated to ${filters.generated_to}`,
+                  onRemove: () => {
+                      setGeneratedTo('');
+                      applyFilters({ generatedTo: '' });
+                  },
+              }
+            : null,
+        filters.sort !== 'newest'
+            ? {
+                  key: 'sort',
+                  label: `Sort: ${sortLabels[filters.sort]}`,
+                  onRemove: () => {
+                      setSort('newest');
+                      applyFilters({ sort: 'newest' });
+                  },
+              }
+            : null,
+    ].filter((filter): filter is ActiveFilter => filter !== null);
+
+    const allVisibleSelected =
+        prompts.data.length > 0 &&
+        prompts.data.every((prompt) => selectedIds.includes(prompt.id));
+
+    const visibleSelectedCount = prompts.data.filter((prompt) =>
+        selectedIds.includes(prompt.id),
+    ).length;
 
     const toggleAllVisible = (checked: boolean | 'indeterminate') => {
         if (checked) {
@@ -388,15 +498,14 @@ export default function AdminPrompts({
         <>
             <Head title="Prompt Management" />
 
-            <div className="flex h-full flex-1 flex-col gap-5 overflow-x-hidden p-4 sm:p-5">
-                <AdminHeader total={prompts.total} />
+            <div className="flex h-full flex-1 flex-col gap-3 overflow-x-hidden bg-[linear-gradient(135deg,rgb(248_250_252),rgb(255_255_255),rgb(239_246_255))] p-3 sm:p-4 dark:bg-background">
+                <AdminHeader summary={summary} total={prompts.total} />
 
-                <ConfigurationAlerts
+                <SummaryGrid
                     aiConfiguration={aiConfiguration}
                     imageAiConfiguration={imageAiConfiguration}
+                    summary={summary}
                 />
-
-                <SummaryGrid summary={summary} />
 
                 <ManagementToolbar
                     activeFilters={activeFilters}
@@ -437,11 +546,22 @@ export default function AdminPrompts({
                     categories={categories}
                     runBulkAction={runBulkAction}
                     selectedCount={selectedIds.length}
+                    clearSelection={() => setSelectedIds([])}
                     setBulkAction={setBulkAction}
                     setBulkCategory={setBulkCategory}
                     setBulkDeleteOpen={setBulkDeleteOpen}
                     setBulkStatus={setBulkStatus}
                     visibleSelectedCount={visibleSelectedCount}
+                />
+
+                <Pagination
+                    onPerPageChange={(value) => {
+                        setPerPage(value);
+                        applyFilters({ perPage: value });
+                    }}
+                    perPage={perPage}
+                    prompts={prompts}
+                    tone="top"
                 />
 
                 <PromptManagementList
@@ -453,7 +573,15 @@ export default function AdminPrompts({
                     togglePrompt={togglePrompt}
                 />
 
-                <Pagination prompts={prompts} />
+                <Pagination
+                    onPerPageChange={(value) => {
+                        setPerPage(value);
+                        applyFilters({ perPage: value });
+                    }}
+                    perPage={perPage}
+                    prompts={prompts}
+                    tone="bottom"
+                />
 
                 <CreationPanels
                     autoCategory={autoCategory}
@@ -503,113 +631,333 @@ export default function AdminPrompts({
     );
 }
 
-function AdminHeader({ total }: { total: number }) {
+function AdminHeader({
+    summary,
+    total,
+}: {
+    summary: PromptStatusSummary;
+    total: number;
+}) {
     return (
-        <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-                <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                    <SlidersHorizontal className="size-4" />
-                    Admin workspace
+        <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white/80 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="flex flex-col gap-3 bg-[linear-gradient(120deg,rgb(255_255_255_/_0.92),rgb(240_249_255_/_0.82),rgb(245_243_255_/_0.72))] p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between dark:bg-[linear-gradient(120deg,rgb(15_23_42_/_0.92),rgb(30_41_59_/_0.72),rgb(49_46_129_/_0.24))]">
+                <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                            variant="outline"
+                            className="rounded-full border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 uppercase dark:border-sky-900/70 dark:bg-sky-950/50 dark:text-sky-300"
+                        >
+                            <SlidersHorizontal className="size-3.5" />
+                            Prompt Ops
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                            {formatNumber(total)} prompt records
+                        </span>
+                    </div>
+                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
+                        <h1 className="text-2xl leading-none font-semibold tracking-tight sm:text-3xl">
+                            Prompt Management
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                            Manage {formatNumber(total)} prompt{' '}
+                            {total === 1 ? 'record' : 'records'} with filters,
+                            editing, retry controls, and bulk actions.
+                        </p>
+                    </div>
                 </div>
-                <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-                    Prompt Management
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                    Manage {total} prompt {total === 1 ? 'record' : 'records'}
-                    with filters, editing, retry controls, and bulk actions.
-                </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-                <Button asChild variant="outline">
-                    <Link href={AdminPromptController.index()}>
-                        <ListChecks />
-                        Prompt list
-                    </Link>
-                </Button>
-                <Button asChild>
-                    <Link href={PromptController.index()}>
-                        <Eye />
-                        Public library
-                    </Link>
-                </Button>
+
+                <div className="flex flex-wrap items-center gap-2">
+                    <HeaderChip label="Completed" value={summary.completed} />
+                    <HeaderChip
+                        label="Attention"
+                        tone={
+                            summary.failed_needing_attention > 0
+                                ? 'danger'
+                                : 'muted'
+                        }
+                        value={summary.failed_needing_attention}
+                    />
+                    <Button asChild variant="outline" size="sm">
+                        <Link href={AdminPromptController.index()}>
+                            <ListChecks />
+                            Prompt list
+                        </Link>
+                    </Button>
+                    <Button asChild size="sm">
+                        <Link href={PromptController.index()}>
+                            <Eye />
+                            Public library
+                        </Link>
+                    </Button>
+                </div>
             </div>
         </div>
     );
 }
 
-function ConfigurationAlerts({
-    aiConfiguration,
-    imageAiConfiguration,
+function HeaderChip({
+    label,
+    tone = 'muted',
+    value,
 }: {
-    aiConfiguration: PromptAiConfiguration;
-    imageAiConfiguration: PromptAiConfiguration;
+    label: string;
+    tone?: 'danger' | 'muted';
+    value: number;
 }) {
     return (
-        <>
-            {!aiConfiguration.is_configured && (
-                <Alert className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-200">
-                    <AlertCircle />
-                    <AlertTitle>AI provider not configured</AlertTitle>
-                    <AlertDescription>
-                        {aiConfiguration.message ??
-                            'Prompt generation cannot run until credentials are configured.'}
-                    </AlertDescription>
-                </Alert>
-            )}
-
-            {!imageAiConfiguration.is_configured && (
-                <Alert className="border-sky-200 bg-sky-50 text-sky-950 dark:border-sky-900/70 dark:bg-sky-950/40 dark:text-sky-100">
-                    <ImageIcon />
-                    <AlertTitle>Thumbnail image provider not configured</AlertTitle>
-                    <AlertDescription>
-                        {imageAiConfiguration.message ??
-                            'Auto prompt thumbnails require OpenAI, Gemini, or xAI image generation credentials.'}
-                    </AlertDescription>
-                </Alert>
-            )}
-        </>
+        <div
+            className={
+                tone === 'danger'
+                    ? 'rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-300'
+                    : 'rounded-full border border-slate-200 bg-white/70 px-3 py-1.5 text-xs text-muted-foreground shadow-sm dark:border-white/10 dark:bg-white/[0.05]'
+            }
+        >
+            <span className="font-semibold text-foreground">
+                {formatNumber(value)}
+            </span>{' '}
+            {label}
+        </div>
     );
 }
 
-function SummaryGrid({ summary }: { summary: PromptStatusSummary }) {
-    const items = [
-        { label: 'Total', value: summary.total, icon: Images },
-        { label: 'Completed', value: summary.completed, icon: CheckCircle2 },
-        { label: 'Pending', value: summary.pending, icon: Clock3 },
-        { label: 'Processing', value: summary.processing, icon: LoaderCircle },
-        { label: 'Failed', value: summary.failed, icon: AlertCircle },
+function SummaryGrid({
+    aiConfiguration,
+    imageAiConfiguration,
+    summary,
+}: {
+    aiConfiguration: PromptAiConfiguration;
+    imageAiConfiguration: PromptAiConfiguration;
+    summary: PromptStatusSummary;
+}) {
+    const statusItems = [
+        {
+            label: 'Completed',
+            value: summary.completed,
+            className: 'bg-emerald-500',
+        },
+        { label: 'Pending', value: summary.pending, className: 'bg-amber-400' },
+        {
+            label: 'Processing',
+            value: summary.processing,
+            className: 'bg-sky-500',
+        },
+        { label: 'Failed', value: summary.failed, className: 'bg-rose-500' },
+    ];
+    const sourceItems = [
         { label: 'Imported', value: summary.imported, icon: Bot },
         { label: 'Auto', value: summary.auto, icon: WandSparkles },
         { label: 'Reference', value: summary.reference_image, icon: ImageIcon },
-        { label: 'Copies', value: summary.total_copies, icon: Copy },
-        {
-            label: 'Needs attention',
-            value: summary.failed_needing_attention,
-            icon: Filter,
-        },
     ];
+    const hasAlerts =
+        !aiConfiguration.is_configured || !imageAiConfiguration.is_configured;
 
     return (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {items.map((item) => {
-                const Icon = item.icon;
-
-                return (
-                    <Card key={item.label} className="gap-3 rounded-lg py-4">
-                        <CardHeader className="flex-row items-center justify-between px-4">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                {item.label}
-                            </CardTitle>
-                            <Icon className="size-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent className="px-4">
-                            <div className="text-2xl font-semibold">
-                                {item.value}
+        <section className="rounded-xl border border-slate-200/80 bg-white/72 p-3 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="grid gap-3 xl:grid-cols-[minmax(24rem,1.25fr)_minmax(18rem,0.95fr)_minmax(15rem,0.7fr)]">
+                <div className="rounded-lg border border-slate-200/80 bg-white/70 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <div className="text-xs font-semibold text-muted-foreground uppercase">
+                                Status distribution
                             </div>
-                        </CardContent>
-                    </Card>
-                );
-            })}
+                            <div className="mt-1 text-2xl font-semibold">
+                                {formatNumber(summary.total)}
+                            </div>
+                        </div>
+                        <BarChart3 className="size-5 text-sky-600" />
+                    </div>
+                    <SegmentedBar items={statusItems} total={summary.total} />
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {statusItems.map((item) => (
+                            <MiniMetric
+                                key={item.label}
+                                colorClass={item.className}
+                                label={item.label}
+                                value={item.value}
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                <div className="rounded-lg border border-slate-200/80 bg-[linear-gradient(135deg,rgb(255_255_255_/_0.78),rgb(248_250_252_/_0.88))] p-3 dark:border-white/10 dark:bg-white/[0.04]">
+                    <div className="mb-3 flex items-center justify-between">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase">
+                            Source mix
+                        </div>
+                        <Images className="size-4 text-muted-foreground" />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                        {sourceItems.map((item) => {
+                            const Icon = item.icon;
+
+                            return (
+                                <div
+                                    key={item.label}
+                                    className="rounded-lg border border-slate-200/70 bg-white/70 p-2 dark:border-white/10 dark:bg-white/[0.04]"
+                                >
+                                    <Icon className="mb-2 size-4 text-muted-foreground" />
+                                    <div className="text-lg font-semibold">
+                                        {formatNumber(item.value)}
+                                    </div>
+                                    <div className="truncate text-[11px] text-muted-foreground">
+                                        {item.label}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                    <InfographicTile
+                        icon={Copy}
+                        label="Copies"
+                        value={summary.total_copies}
+                    />
+                    <InfographicTile
+                        icon={AlertCircle}
+                        label="Needs attention"
+                        tone={
+                            summary.failed_needing_attention > 0
+                                ? 'danger'
+                                : 'default'
+                        }
+                        value={summary.failed_needing_attention}
+                    />
+                </div>
+            </div>
+
+            {hasAlerts && (
+                <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                    {!aiConfiguration.is_configured && (
+                        <CompactAlert
+                            icon={AlertCircle}
+                            message={
+                                aiConfiguration.message ??
+                                'Prompt generation cannot run until credentials are configured.'
+                            }
+                            title="AI provider not configured"
+                            tone="amber"
+                        />
+                    )}
+                    {!imageAiConfiguration.is_configured && (
+                        <CompactAlert
+                            icon={ImageIcon}
+                            message={
+                                imageAiConfiguration.message ??
+                                'Auto prompt thumbnails require image generation credentials.'
+                            }
+                            title="Thumbnail provider not configured"
+                            tone="sky"
+                        />
+                    )}
+                </div>
+            )}
+        </section>
+    );
+}
+
+function SegmentedBar({
+    items,
+    total,
+}: {
+    items: Array<{ className: string; label: string; value: number }>;
+    total: number;
+}) {
+    return (
+        <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+            {items.map((item) => (
+                <div
+                    key={item.label}
+                    className={item.className}
+                    style={{ width: `${percentage(item.value, total)}%` }}
+                    title={`${item.label}: ${formatNumber(item.value)}`}
+                />
+            ))}
+        </div>
+    );
+}
+
+function MiniMetric({
+    colorClass,
+    label,
+    value,
+}: {
+    colorClass: string;
+    label: string;
+    value: number;
+}) {
+    return (
+        <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+                <span className={`size-2 rounded-full ${colorClass}`} />
+                <span className="truncate text-[11px] text-muted-foreground">
+                    {label}
+                </span>
+            </div>
+            <div className="mt-1 text-sm font-semibold tabular-nums">
+                {formatNumber(value)}
+            </div>
+        </div>
+    );
+}
+
+function InfographicTile({
+    icon: Icon,
+    label,
+    tone = 'default',
+    value,
+}: {
+    icon: LucideIcon;
+    label: string;
+    tone?: 'danger' | 'default';
+    value: number;
+}) {
+    return (
+        <div
+            className={
+                tone === 'danger'
+                    ? 'rounded-lg border border-rose-200 bg-rose-50/90 p-3 text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-300'
+                    : 'rounded-lg border border-slate-200/80 bg-white/70 p-3 dark:border-white/10 dark:bg-white/[0.04]'
+            }
+        >
+            <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-semibold text-muted-foreground uppercase">
+                    {label}
+                </div>
+                <Icon className="size-4" />
+            </div>
+            <div className="mt-2 text-2xl font-semibold tabular-nums">
+                {formatNumber(value)}
+            </div>
+        </div>
+    );
+}
+
+function CompactAlert({
+    icon: Icon,
+    message,
+    title,
+    tone,
+}: {
+    icon: LucideIcon;
+    message: string;
+    title: string;
+    tone: 'amber' | 'sky';
+}) {
+    return (
+        <div
+            className={
+                tone === 'amber'
+                    ? 'flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/85 px-3 py-2 text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-200'
+                    : 'flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50/85 px-3 py-2 text-sky-950 dark:border-sky-900/70 dark:bg-sky-950/40 dark:text-sky-100'
+            }
+        >
+            <Icon className="mt-0.5 size-4 shrink-0" />
+            <div className="min-w-0">
+                <div className="text-sm font-semibold">{title}</div>
+                <div className="line-clamp-2 text-xs opacity-80">{message}</div>
+            </div>
         </div>
     );
 }
@@ -645,7 +993,7 @@ function ManagementToolbar({
     submit,
     applyFilters,
 }: {
-    activeFilters: string[];
+    activeFilters: ActiveFilter[];
     categories: PromptCategory[];
     category: PromptCategory | 'all';
     clearFilters: () => void;
@@ -675,155 +1023,207 @@ function ManagementToolbar({
     submit: (event: FormEvent<HTMLFormElement>) => void;
     applyFilters: () => void;
 }) {
+    const dateFiltersActive =
+        createdFrom !== '' ||
+        createdTo !== '' ||
+        generatedFrom !== '' ||
+        generatedTo !== '';
+    const [advancedOpen, setAdvancedOpen] = useState(dateFiltersActive);
+
     return (
-        <Card className="rounded-lg">
-            <CardHeader className="gap-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <CardTitle className="flex items-center gap-2">
-                            <Filter className="size-5" />
-                            Filters
-                        </CardTitle>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Search and segment large prompt imports without
-                            losing the current query string.
-                        </p>
+        <section className="rounded-xl border border-slate-200/80 bg-white/78 p-3 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04]">
+            <form onSubmit={submit} className="grid gap-3">
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-center gap-2">
+                        <span className="grid size-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200">
+                            <Filter className="size-4" />
+                        </span>
+                        <div>
+                            <h2 className="text-sm font-semibold">
+                                Filters
+                            </h2>
+                            <p className="text-xs text-muted-foreground">
+                                Compact controls for large prompt imports.
+                            </p>
+                        </div>
                     </div>
-                    {activeFilters.length > 0 && (
+
+                    <div className="flex flex-wrap gap-2">
+                        <Collapsible
+                            open={advancedOpen}
+                            onOpenChange={setAdvancedOpen}
+                        >
+                            <CollapsibleTrigger asChild>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className={
+                                        dateFiltersActive
+                                            ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/70 dark:bg-sky-950/40 dark:text-sky-300'
+                                            : undefined
+                                    }
+                                >
+                                    <SlidersHorizontal />
+                                    Advanced filters
+                                    <ChevronDown
+                                        className={
+                                            advancedOpen
+                                                ? 'rotate-180 transition-transform'
+                                                : 'transition-transform'
+                                        }
+                                    />
+                                </Button>
+                            </CollapsibleTrigger>
+                        </Collapsible>
                         <Button
                             type="button"
                             variant="outline"
                             size="sm"
                             onClick={clearFilters}
+                            disabled={activeFilters.length === 0}
                         >
                             <X />
-                            Reset filters
+                            Reset
                         </Button>
-                    )}
+                    </div>
                 </div>
+
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(16rem,1.4fr)_repeat(5,minmax(8rem,0.75fr))_auto]">
+                    <div className="relative min-w-0 md:col-span-2 xl:col-span-1">
+                        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            className="h-9 bg-white/80 pl-9 dark:bg-white/[0.04]"
+                            placeholder="Search title, prompt, source, errors"
+                        />
+                    </div>
+                    <FilterSelect
+                        label="Status"
+                        value={status}
+                        onChange={(value) =>
+                            setStatus(value as PromptStatus | 'all')
+                        }
+                        options={statuses.map((option) => ({
+                            value: option,
+                            label: statusLabels[option],
+                        }))}
+                    />
+                    <FilterSelect
+                        label="Category"
+                        value={category}
+                        onChange={(value) =>
+                            setCategory(value as PromptCategory | 'all')
+                        }
+                        options={categories.map((option) => ({
+                            value: option,
+                            label: categoryLabels[option],
+                        }))}
+                    />
+                    <FilterSelect
+                        label="Mode"
+                        value={generationMode}
+                        onChange={(value) =>
+                            setGenerationMode(
+                                value as PromptGenerationMode | 'all',
+                            )
+                        }
+                        options={generationModes.map((option) => ({
+                            value: option,
+                            label: generationModeLabels[option],
+                        }))}
+                    />
+                    <FilterSelect
+                        label="Source"
+                        value={sourceSite}
+                        onChange={(value) =>
+                            setSourceSite(value as SourceSiteFilter | 'all')
+                        }
+                        options={sourceSites.map((option) => ({
+                            value: option,
+                            label: sourceSiteLabels[option],
+                        }))}
+                    />
+                    <FilterSelect
+                        label="Sort"
+                        value={sort}
+                        onChange={(value) => setSort(value as AdminSort)}
+                        includeAll={false}
+                        options={sorts.map((option) => ({
+                            value: option,
+                            label: sortLabels[option],
+                        }))}
+                    />
+                    <div className="flex gap-2 md:col-span-2 xl:col-span-1">
+                        <Button type="submit" className="h-9 flex-1 xl:flex-none">
+                            <Search />
+                            Apply
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 shrink-0"
+                            title="Refresh"
+                            onClick={() => applyFilters()}
+                        >
+                            <RefreshCw />
+                            <span className="sr-only">Refresh</span>
+                        </Button>
+                    </div>
+                </div>
+
+                <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+                    <CollapsibleContent>
+                        <div className="grid gap-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-3 md:grid-cols-2 xl:grid-cols-4 dark:border-white/10 dark:bg-white/[0.03]">
+                            <DateInput
+                                label="Created from"
+                                value={createdFrom}
+                                onChange={setCreatedFrom}
+                            />
+                            <DateInput
+                                label="Created to"
+                                value={createdTo}
+                                onChange={setCreatedTo}
+                            />
+                            <DateInput
+                                label="Generated from"
+                                value={generatedFrom}
+                                onChange={setGeneratedFrom}
+                            />
+                            <DateInput
+                                label="Generated to"
+                                value={generatedTo}
+                                onChange={setGeneratedTo}
+                            />
+                        </div>
+                    </CollapsibleContent>
+                </Collapsible>
+
                 {activeFilters.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                         {activeFilters.map((filter) => (
-                            <Badge key={filter} variant="secondary">
-                                {filter}
+                            <Badge
+                                key={filter.key}
+                                variant="secondary"
+                                className="gap-1 rounded-full py-1 pr-1 pl-2"
+                            >
+                                {filter.label}
+                                <button
+                                    type="button"
+                                    className="rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/10"
+                                    onClick={filter.onRemove}
+                                    aria-label={`Remove ${filter.label}`}
+                                >
+                                    <X className="size-3" />
+                                </button>
                             </Badge>
                         ))}
                     </div>
                 )}
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={submit} className="grid gap-3">
-                    <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1.4fr)_repeat(4,minmax(10rem,1fr))]">
-                        <div className="relative min-w-0">
-                            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                value={search}
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
-                                }
-                                className="pl-9"
-                                placeholder="Search title, prompt, source, errors"
-                            />
-                        </div>
-                        <FilterSelect
-                            label="Status"
-                            value={status}
-                            onChange={(value) =>
-                                setStatus(value as PromptStatus | 'all')
-                            }
-                            options={statuses.map((option) => ({
-                                value: option,
-                                label: statusLabels[option],
-                            }))}
-                        />
-                        <FilterSelect
-                            label="Category"
-                            value={category}
-                            onChange={(value) =>
-                                setCategory(value as PromptCategory | 'all')
-                            }
-                            options={categories.map((option) => ({
-                                value: option,
-                                label: categoryLabels[option],
-                            }))}
-                        />
-                        <FilterSelect
-                            label="Mode"
-                            value={generationMode}
-                            onChange={(value) =>
-                                setGenerationMode(
-                                    value as PromptGenerationMode | 'all',
-                                )
-                            }
-                            options={generationModes.map((option) => ({
-                                value: option,
-                                label: generationModeLabels[option],
-                            }))}
-                        />
-                        <FilterSelect
-                            label="Source"
-                            value={sourceSite}
-                            onChange={(value) =>
-                                setSourceSite(value as SourceSiteFilter | 'all')
-                            }
-                            options={sourceSites.map((option) => ({
-                                value: option,
-                                label: sourceSiteLabels[option],
-                            }))}
-                        />
-                    </div>
-
-                    <div className="grid gap-3 lg:grid-cols-[repeat(4,minmax(10rem,1fr))_minmax(10rem,1fr)_auto]">
-                        <DateInput
-                            label="Created from"
-                            value={createdFrom}
-                            onChange={setCreatedFrom}
-                        />
-                        <DateInput
-                            label="Created to"
-                            value={createdTo}
-                            onChange={setCreatedTo}
-                        />
-                        <DateInput
-                            label="Generated from"
-                            value={generatedFrom}
-                            onChange={setGeneratedFrom}
-                        />
-                        <DateInput
-                            label="Generated to"
-                            value={generatedTo}
-                            onChange={setGeneratedTo}
-                        />
-                        <FilterSelect
-                            label="Sort"
-                            value={sort}
-                            onChange={(value) => setSort(value as AdminSort)}
-                            includeAll={false}
-                            options={sorts.map((option) => ({
-                                value: option,
-                                label: sortLabels[option],
-                            }))}
-                        />
-                        <div className="flex items-end gap-2">
-                            <Button type="submit" className="w-full lg:w-auto">
-                                <Search />
-                                Apply
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                title="Refresh"
-                                onClick={() => applyFilters()}
-                            >
-                                <RefreshCw />
-                                <span className="sr-only">Refresh</span>
-                            </Button>
-                        </div>
-                    </div>
-                </form>
-            </CardContent>
-        </Card>
+            </form>
+        </section>
     );
 }
 
@@ -841,10 +1241,12 @@ function FilterSelect({
     value: string;
 }) {
     return (
-        <div className="grid gap-1.5">
-            <Label className="text-xs text-muted-foreground">{label}</Label>
+        <div className="grid min-w-0 gap-1">
+            <Label className="text-[11px] font-medium text-muted-foreground">
+                {label}
+            </Label>
             <Select value={value} onValueChange={onChange}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="h-9 w-full bg-white/80 dark:bg-white/[0.04]">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -870,11 +1272,14 @@ function DateInput({
     value: string;
 }) {
     return (
-        <div className="grid gap-1.5">
-            <Label className="text-xs text-muted-foreground">{label}</Label>
+        <div className="grid gap-1">
+            <Label className="text-[11px] font-medium text-muted-foreground">
+                {label}
+            </Label>
             <Input
                 type="date"
                 value={value}
+                className="h-9 bg-white/80 dark:bg-white/[0.04]"
                 onChange={(event) => onChange(event.target.value)}
             />
         </div>
@@ -886,6 +1291,7 @@ function BulkActionBar({
     bulkCategory,
     bulkStatus,
     categories,
+    clearSelection,
     runBulkAction,
     selectedCount,
     setBulkAction,
@@ -898,6 +1304,7 @@ function BulkActionBar({
     bulkCategory: PromptCategory;
     bulkStatus: PromptStatus;
     categories: PromptCategory[];
+    clearSelection: () => void;
     runBulkAction: (action?: BulkAction) => void;
     selectedCount: number;
     setBulkAction: (action: BulkAction) => void;
@@ -908,18 +1315,25 @@ function BulkActionBar({
 }) {
     if (selectedCount === 0) {
         return (
-            <div className="rounded-lg border border-dashed bg-muted/25 p-3 text-sm text-muted-foreground">
-                Select prompts to enable bulk status, category, retry, or delete
-                actions.
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-slate-200 bg-white/55 px-3 py-2 text-sm text-muted-foreground backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
+                <span className="flex items-center gap-2">
+                    <ListChecks className="size-4" />
+                    Select prompts to enable bulk actions.
+                </span>
+                <span className="hidden text-xs sm:inline">
+                    Bulk status, category, retry, and delete
+                </span>
             </div>
         );
     }
 
     return (
-        <div className="grid gap-3 rounded-lg border bg-card p-3 shadow-sm lg:grid-cols-[auto_auto_auto_1fr_auto] lg:items-center">
+        <div className="sticky top-2 z-20 grid gap-2 rounded-xl border border-slate-200/80 bg-white/90 p-2 shadow-lg backdrop-blur-xl sm:grid-cols-[auto_minmax(10rem,12rem)_minmax(10rem,12rem)_1fr_auto_auto] sm:items-center dark:border-white/10 dark:bg-background/90">
             <div className="flex items-center gap-2 text-sm font-medium">
-                <ListChecks className="size-4" />
-                {selectedCount} selected
+                <span className="grid size-7 place-items-center rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-950">
+                    <ListChecks className="size-4" />
+                </span>
+                {formatNumber(selectedCount)} selected
                 {visibleSelectedCount !== selectedCount && (
                     <span className="text-xs text-muted-foreground">
                         ({visibleSelectedCount} visible)
@@ -930,7 +1344,7 @@ function BulkActionBar({
                 value={bulkAction}
                 onValueChange={(value) => setBulkAction(value as BulkAction)}
             >
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -947,7 +1361,7 @@ function BulkActionBar({
                         setBulkStatus(value as PromptStatus)
                     }
                 >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-9">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -966,7 +1380,7 @@ function BulkActionBar({
                         setBulkCategory(value as PromptCategory)
                     }
                 >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-9">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -978,9 +1392,10 @@ function BulkActionBar({
                     </SelectContent>
                 </Select>
             )}
-            <div className="hidden lg:block" />
+            <div className="hidden sm:block" />
             <Button
                 type="button"
+                size="sm"
                 variant={bulkAction === 'delete' ? 'destructive' : 'default'}
                 onClick={() =>
                     bulkAction === 'delete'
@@ -990,6 +1405,15 @@ function BulkActionBar({
             >
                 {bulkAction === 'delete' ? <Trash2 /> : <CheckCircle2 />}
                 Apply action
+            </Button>
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={clearSelection}
+            >
+                <X />
+                Clear
             </Button>
         </div>
     );
@@ -1018,10 +1442,10 @@ function PromptManagementList({
     }
 
     return (
-        <Card className="overflow-hidden rounded-lg py-0">
+        <Card className="overflow-hidden rounded-xl border-slate-200/80 bg-white/86 py-0 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04]">
             <div className="hidden overflow-x-auto xl:block">
                 <div className="min-w-[1040px]">
-                    <div className="grid grid-cols-[2.5rem_5rem_minmax(18rem,1.3fr)_9rem_9rem_8rem_7rem_9rem_9rem] gap-3 border-b bg-muted/40 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">
+                    <div className="sticky top-0 z-10 grid grid-cols-[2.25rem_4rem_minmax(18rem,1.45fr)_8rem_8rem_8rem_6rem_8rem_8rem] gap-2 border-b bg-slate-50/95 px-3 py-2 text-[11px] font-semibold text-muted-foreground uppercase backdrop-blur dark:bg-background/95">
                         <Checkbox
                             checked={allVisibleSelected}
                             onCheckedChange={toggleAllVisible}
@@ -1048,8 +1472,8 @@ function PromptManagementList({
                 </div>
             </div>
 
-            <div className="grid gap-3 p-3 xl:hidden">
-                <div className="flex items-center gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
+            <div className="grid gap-2 p-2 xl:hidden">
+                <div className="flex items-center gap-2 rounded-lg border bg-slate-50/80 p-2 text-sm dark:bg-white/[0.04]">
                     <Checkbox
                         checked={allVisibleSelected}
                         onCheckedChange={toggleAllVisible}
@@ -1086,7 +1510,7 @@ function PromptTableRow({
     ) => void;
 }) {
     return (
-        <div className="grid grid-cols-[2.5rem_5rem_minmax(18rem,1.3fr)_9rem_9rem_8rem_7rem_9rem_9rem] gap-3 border-b px-4 py-3 last:border-b-0 hover:bg-muted/25">
+        <div className="grid grid-cols-[2.25rem_4rem_minmax(18rem,1.45fr)_8rem_8rem_8rem_6rem_8rem_8rem] items-center gap-2 border-b px-3 py-2 last:border-b-0 hover:bg-sky-50/45 dark:hover:bg-white/[0.04]">
             <div className="flex items-center">
                 <Checkbox
                     checked={selected}
@@ -1109,14 +1533,14 @@ function PromptTableRow({
                         </Badge>
                     )}
                 </div>
-                <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">
+                <p className="mt-0.5 line-clamp-1 text-xs leading-5 text-muted-foreground">
                     {prompt.prompt_preview ||
                         prompt.source_idea ||
                         prompt.error_message ||
                         'No prompt text yet.'}
                 </p>
                 {prompt.source_slug && (
-                    <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                    <p className="truncate font-mono text-[11px] text-muted-foreground">
                         {prompt.source_slug}
                     </p>
                 )}
@@ -1130,10 +1554,12 @@ function PromptTableRow({
                     {providerLabel(prompt)}
                 </p>
             </div>
-            <div className="text-sm">
+            <div className="truncate text-sm">
                 {prompt.category ? categoryLabels[prompt.category] : 'None'}
             </div>
-            <div className="text-sm tabular-nums">{prompt.copy_count}</div>
+            <div className="text-sm tabular-nums">
+                {formatNumber(prompt.copy_count)}
+            </div>
             <div className="text-sm text-muted-foreground">
                 {formatDate(prompt.generated_at)}
             </div>
@@ -1157,10 +1583,10 @@ function PromptMobileCard({
     ) => void;
 }) {
     return (
-        <div className="grid gap-3 rounded-lg border bg-card p-3 shadow-sm sm:grid-cols-[7rem_minmax(0,1fr)]">
+        <div className="grid gap-2 rounded-lg border bg-white/82 p-2 shadow-sm sm:grid-cols-[5.5rem_minmax(0,1fr)] dark:bg-white/[0.04]">
             <PromptThumb prompt={prompt} large />
-            <div className="min-w-0 space-y-3">
-                <div className="flex items-start gap-3">
+            <div className="min-w-0 space-y-2">
+                <div className="flex items-start gap-2">
                     <Checkbox
                         checked={selected}
                         onCheckedChange={(checked) =>
@@ -1175,7 +1601,7 @@ function PromptMobileCard({
                         >
                             {prompt.title}
                         </Link>
-                        <p className="mt-1 line-clamp-3 text-sm leading-5 text-muted-foreground">
+                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
                             {prompt.prompt_preview ||
                                 prompt.source_idea ||
                                 prompt.error_message ||
@@ -1183,7 +1609,7 @@ function PromptMobileCard({
                         </p>
                     </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                     <StatusBadge status={prompt.status} />
                     <GenerationModeBadge mode={prompt.generation_mode} />
                     {prompt.category && (
@@ -1193,10 +1619,10 @@ function PromptMobileCard({
                     )}
                     <Badge variant="outline">
                         <Copy className="size-3" />
-                        {prompt.copy_count}
+                        {formatNumber(prompt.copy_count)}
                     </Badge>
                 </div>
-                <div className="grid gap-1 text-xs text-muted-foreground">
+                <div className="grid gap-0.5 text-xs text-muted-foreground">
                     <span>Generated {formatDate(prompt.generated_at)}</span>
                     <span>{providerLabel(prompt)}</span>
                 </div>
@@ -1215,7 +1641,7 @@ function PromptThumb({
 }) {
     const className = large
         ? 'aspect-[4/3] w-full rounded-md object-cover'
-        : 'aspect-square w-16 rounded-md object-cover';
+        : 'size-12 rounded-md object-cover';
 
     return prompt.thumbnail_url ? (
         <img
@@ -1722,22 +2148,64 @@ function GenerationModeBadge({ mode }: { mode: PromptGenerationMode }) {
     );
 }
 
-function Pagination({ prompts }: { prompts: Paginated<AdminPromptItem> }) {
-    if (prompts.last_page <= 1) {
+function Pagination({
+    onPerPageChange,
+    perPage,
+    prompts,
+    tone,
+}: {
+    onPerPageChange: (value: AdminPerPage) => void;
+    perPage: AdminPerPage;
+    prompts: Paginated<AdminPromptItem>;
+    tone: 'bottom' | 'top';
+}) {
+    if (prompts.total === 0) {
         return null;
     }
 
     return (
-        <div className="flex flex-col gap-3 border-t pt-4 text-sm sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-muted-foreground">
-                Showing {prompts.from ?? 0}-{prompts.to ?? 0} of{' '}
-                {prompts.total}
-            </span>
-            <div className="flex gap-2">
+        <div
+            className={
+                tone === 'top'
+                    ? 'flex flex-col gap-2 rounded-xl border border-slate-200/80 bg-white/76 px-3 py-2 text-sm shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-white/[0.04]'
+                    : 'flex flex-col gap-2 border-t border-slate-200/80 pt-3 text-sm sm:flex-row sm:items-center sm:justify-between dark:border-white/10'
+            }
+        >
+            <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                <span>
+                    Showing {formatNumber(prompts.from ?? 0)}-
+                    {formatNumber(prompts.to ?? 0)} of{' '}
+                    {formatNumber(prompts.total)}
+                </span>
+                <span className="hidden sm:inline">/</span>
+                <span>
+                    Page {formatNumber(prompts.current_page)} of{' '}
+                    {formatNumber(prompts.last_page)}
+                </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+                <Select
+                    value={String(perPage)}
+                    onValueChange={(value) =>
+                        onPerPageChange(Number(value) as AdminPerPage)
+                    }
+                >
+                    <SelectTrigger className="h-8 w-[7.5rem] bg-white/80 text-xs dark:bg-white/[0.04]">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {perPageOptions.map((option) => (
+                            <SelectItem key={option} value={String(option)}>
+                                {option} / page
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
                 <Button
                     asChild
                     variant="outline"
                     size="sm"
+                    className="h-8"
                     disabled={!prompts.prev_page_url}
                 >
                     {prompts.prev_page_url ? (
@@ -1750,6 +2218,7 @@ function Pagination({ prompts }: { prompts: Paginated<AdminPromptItem> }) {
                     asChild
                     variant="outline"
                     size="sm"
+                    className="h-8"
                     disabled={!prompts.next_page_url}
                 >
                     {prompts.next_page_url ? (
@@ -1781,6 +2250,18 @@ function providerLabel(prompt: AdminPromptItem): string {
 
 function formatDate(value: string | null): string {
     return value ? value.slice(0, 10) : 'Not generated';
+}
+
+function formatNumber(value: number): string {
+    return new Intl.NumberFormat('en-US').format(value);
+}
+
+function percentage(value: number, total: number): number {
+    if (total <= 0 || value <= 0) {
+        return 0;
+    }
+
+    return Math.max((value / total) * 100, 1.5);
 }
 
 AdminPrompts.layout = {

@@ -377,6 +377,28 @@ test('admin prompt management filters and sorts prompt records', function (): vo
         ->and(collect($copySortResults)->pluck('id')->first())->toBe($imported->id);
 });
 
+test('admin prompt management supports allowed per page sizes', function (): void {
+    $admin = User::factory()->admin()->create();
+
+    Prompt::factory()->count(60)->create();
+
+    $this->actingAs($admin)
+        ->get('/admin/prompts?per_page=48')
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.per_page', 48)
+            ->where('prompts.per_page', 48)
+            ->has('prompts.data', 48));
+
+    $this->actingAs($admin)
+        ->get('/admin/prompts?per_page=999')
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.per_page', 24)
+            ->where('prompts.per_page', 24)
+            ->has('prompts.data', 24));
+});
+
 test('admins can open the prompt edit page', function (): void {
     $admin = User::factory()->admin()->create();
     $prompt = Prompt::factory()->create([

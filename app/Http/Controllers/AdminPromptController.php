@@ -54,6 +54,8 @@ class AdminPromptController extends Controller
         self::SORT_GENERATION_MODE,
     ];
 
+    private const PER_PAGE_OPTIONS = [24, 48, 96];
+
     public function index(
         Request $request,
         BuildPromptStatusSummary $buildPromptStatusSummary,
@@ -78,7 +80,7 @@ class AdminPromptController extends Controller
         $this->applySort($query, $filters['sort']);
 
         $prompts = $query
-            ->paginate(24)
+            ->paginate($filters['per_page'])
             ->withQueryString()
             ->through(fn (Prompt $prompt): array => $this->adminPromptData($prompt));
 
@@ -272,7 +274,7 @@ class AdminPromptController extends Controller
     }
 
     /**
-     * @return array{search: string, status: string|null, category: string|null, generation_mode: string|null, source_site: string|null, created_from: string|null, created_to: string|null, generated_from: string|null, generated_to: string|null, sort: string}
+     * @return array{search: string, status: string|null, category: string|null, generation_mode: string|null, source_site: string|null, created_from: string|null, created_to: string|null, generated_from: string|null, generated_to: string|null, sort: string, per_page: int}
      */
     private function filters(Request $request): array
     {
@@ -281,6 +283,7 @@ class AdminPromptController extends Controller
         $generationMode = (string) $request->string('generation_mode');
         $sourceSite = (string) $request->string('source_site');
         $sort = (string) $request->string('sort', self::SORT_NEWEST);
+        $perPage = $request->integer('per_page', 24);
 
         return [
             'search' => trim((string) $request->string('search')),
@@ -293,6 +296,7 @@ class AdminPromptController extends Controller
             'generated_from' => $this->dateFilter($request->string('generated_from')->toString()),
             'generated_to' => $this->dateFilter($request->string('generated_to')->toString()),
             'sort' => in_array($sort, self::SORTS, true) ? $sort : self::SORT_NEWEST,
+            'per_page' => in_array($perPage, self::PER_PAGE_OPTIONS, true) ? $perPage : 24,
         ];
     }
 
