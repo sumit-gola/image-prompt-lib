@@ -73,8 +73,8 @@
     --color-lumen-primary-bright: var(--lumen-primary-bright);
     --color-lumen-accent: var(--lumen-accent);
     --color-lumen-premium: var(--lumen-premium);
-    --shadow-lumen-card: 0 24px 80px rgb(0 0 0 / 0.32);
-    --shadow-lumen-glow: 0 0 42px rgb(139 92 246 / 0.22);
+    --shadow-lumen-card: var(--lumen-card-shadow);
+    --shadow-lumen-glow: var(--lumen-glow-shadow);
 }
 
 :root {
@@ -112,19 +112,26 @@
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.87 0 0);
 
-    --lumen-obsidian: #06070b;
-    --lumen-panel: #0b0d14;
-    --lumen-surface: #11141d;
-    --lumen-hover: #171b27;
-    --lumen-line: rgb(255 255 255 / 0.08);
-    --lumen-line-strong: rgb(255 255 255 / 0.15);
-    --lumen-text: #f7f8fc;
-    --lumen-soft: #a7adbd;
-    --lumen-muted: #747b8e;
-    --lumen-primary: #8b5cf6;
-    --lumen-primary-bright: #a78bfa;
-    --lumen-accent: #22d3ee;
-    --lumen-premium: #f472b6;
+    --lumen-obsidian: #f8fafc;
+    --lumen-panel: rgb(255 255 255 / 0.72);
+    --lumen-surface: rgb(255 255 255 / 0.82);
+    --lumen-hover: rgb(255 255 255 / 0.94);
+    --lumen-line: rgb(15 23 42 / 0.08);
+    --lumen-line-strong: rgb(124 58 237 / 0.22);
+    --lumen-text: #111827;
+    --lumen-soft: #475569;
+    --lumen-muted: #64748b;
+    --lumen-primary: #7c3aed;
+    --lumen-primary-bright: #a855f7;
+    --lumen-accent: #06b6d4;
+    --lumen-premium: #ec4899;
+    --lumen-grid-line: rgb(124 58 237 / 0.07);
+    --lumen-grain-dot-a: rgb(124 58 237 / 0.14);
+    --lumen-grain-dot-b: rgb(6 182 212 / 0.12);
+    --lumen-card-shadow: 0 24px 80px rgb(15 23 42 / 0.1);
+    --lumen-glow-shadow: 0 24px 70px rgb(124 58 237 / 0.18);
+    --lumen-scanline-start: rgb(6 182 212 / 0.72);
+    --lumen-scanline-end: rgb(236 72 153 / 0.68);
 }
 
 .dark {
@@ -160,6 +167,27 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(0.269 0 0);
     --sidebar-ring: oklch(0.439 0 0);
+
+    --lumen-obsidian: #06070b;
+    --lumen-panel: #0b0d14;
+    --lumen-surface: #11141d;
+    --lumen-hover: #171b27;
+    --lumen-line: rgb(255 255 255 / 0.08);
+    --lumen-line-strong: rgb(255 255 255 / 0.15);
+    --lumen-text: #f7f8fc;
+    --lumen-soft: #a7adbd;
+    --lumen-muted: #747b8e;
+    --lumen-primary: #8b5cf6;
+    --lumen-primary-bright: #a78bfa;
+    --lumen-accent: #22d3ee;
+    --lumen-premium: #f472b6;
+    --lumen-grid-line: rgb(255 255 255 / 0.035);
+    --lumen-grain-dot-a: rgb(255 255 255 / 0.18);
+    --lumen-grain-dot-b: rgb(255 255 255 / 0.14);
+    --lumen-card-shadow: 0 24px 80px rgb(0 0 0 / 0.32);
+    --lumen-glow-shadow: 0 0 42px rgb(139 92 246 / 0.22);
+    --lumen-scanline-start: rgb(34 211 238 / 0.75);
+    --lumen-scanline-end: rgb(244 114 182 / 0.72);
 }
 
 @layer base {
@@ -175,8 +203,8 @@
 @layer utilities {
     .lumen-grid {
         background-image:
-            linear-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px),
-            linear-gradient(90deg, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+            linear-gradient(var(--lumen-grid-line) 1px, transparent 1px),
+            linear-gradient(90deg, var(--lumen-grid-line) 1px, transparent 1px);
         background-size: 34px 34px;
     }
 
@@ -192,8 +220,16 @@
         content: '';
         opacity: 0.13;
         background-image:
-            radial-gradient(circle at 20% 30%, rgb(255 255 255 / 0.18) 0 1px, transparent 1px),
-            radial-gradient(circle at 70% 80%, rgb(255 255 255 / 0.14) 0 1px, transparent 1px);
+            radial-gradient(
+                circle at 20% 30%,
+                var(--lumen-grain-dot-a) 0 1px,
+                transparent 1px
+            ),
+            radial-gradient(
+                circle at 70% 80%,
+                var(--lumen-grain-dot-b) 0 1px,
+                transparent 1px
+            );
         background-size:
             23px 23px,
             31px 31px;
@@ -201,7 +237,13 @@
     }
 
     .lumen-scanline {
-        background-image: linear-gradient(90deg, transparent, rgb(34 211 238 / 0.75), rgb(244 114 182 / 0.72), transparent);
+        background-image: linear-gradient(
+            90deg,
+            transparent,
+            var(--lumen-scanline-start),
+            var(--lumen-scanline-end),
+            transparent
+        );
     }
 
     @keyframes lumen-float {

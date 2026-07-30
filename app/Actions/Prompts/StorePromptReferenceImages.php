@@ -34,6 +34,7 @@ class StorePromptReferenceImages
             $prompt = Prompt::query()->create([
                 'user_id' => $user->id,
                 'title' => 'Generating prompt',
+                'generation_mode' => Prompt::GENERATION_MODE_REFERENCE_IMAGE,
                 'reference_image_path' => $referencePath,
                 'thumbnail_path' => $thumbnailPath,
                 'status' => Prompt::STATUS_PENDING,

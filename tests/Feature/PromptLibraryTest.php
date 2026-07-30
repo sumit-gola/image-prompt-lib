@@ -1,6 +1,8 @@
 <?php
 
+use App\Ai\Agents\AutoPromptGeneratorAgent;
 use App\Ai\Agents\ReferenceImagePromptAgent;
+use App\Jobs\GenerateAutoPromptJob;
 use App\Jobs\GeneratePromptFromReferenceImageJob;
 use App\Models\Prompt;
 use App\Models\User;
@@ -8,6 +10,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Laravel\Ai\Image;
 
 test('homepage shows only completed prompts', function (): void {
     $completed = Prompt::factory()->create([
@@ -284,7 +287,9 @@ test('admins can upload prompt references', function (): void {
 test('admins can view prompt dashboard summaries', function (): void {
     config([
         'ai.prompt_library.provider' => 'openai',
+        'ai.prompt_library.image_provider' => null,
         'ai.providers.openai.key' => null,
+        'ai.providers.gemini.key' => null,
     ]);
 
     $admin = User::factory()->admin()->create();
@@ -303,7 +308,9 @@ test('admins can view prompt dashboard summaries', function (): void {
             ->where('summary.pending', 1)
             ->where('summary.failed', 1)
             ->where('aiConfiguration.is_configured', false)
-            ->where('aiConfiguration.credential_env', 'OPENAI_API_KEY'));
+            ->where('aiConfiguration.credential_env', 'OPENAI_API_KEY')
+            ->where('imageAiConfiguration.is_configured', false)
+            ->where('imageAiConfiguration.credential_env', 'GEMINI_API_KEY'));
 });
 
 test('admins can regenerate failed prompt references', function (): void {
@@ -332,6 +339,316 @@ test('admins can regenerate failed prompt references', function (): void {
     Bus::assertDispatched(
         GeneratePromptFromReferenceImageJob::class,
         fn (GeneratePromptFromReferenceImageJob $job): bool => $job->prompt->is($prompt),
+    );
+});
+
+test('non admins cannot create auto prompts', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post('/admin/prompts/auto', [
+            'idea' => 'A cinematic city portrait',
+            'category' => Prompt::CATEGORY_PORTRAIT,
+        ])
+        ->assertForbidden();
+
+    expect(Prompt::query()->count())->toBe(0);
+    Bus::assertNotDispatched(GenerateAutoPromptJob::class);
+});
+
+test('admins can create auto prompt requests', function (): void {
+    Bus::fake();
+
+    $admin = User::factory()->admin()->create();
+
+    $this->actingAs($admin)
+        ->post('/admin/prompts/auto', [
+            'idea' => 'A cinematic product photo of a matte black perfume bottle.',
+            'category' => Prompt::CATEGORY_PRODUCT,
+            'visual_style' => 'Luxury editorial product photography',
+            'subject' => 'Replaceable product',
+            'mood' => 'Premium and dramatic',
+            'lighting' => 'Low side light',
+            'camera_notes' => 'Low three-quarter angle',
+            'target_model_notes' => 'Works well in Midjourney or Flux',
+            'negative_notes' => 'No text, no watermark',
+        ])
+        ->assertRedirect('/admin/prompts');
+
+    $prompt = Prompt::query()->firstOrFail();
+
+    expect($prompt)
+        ->user_id->toBe($admin->id)
+        ->status->toBe(Prompt::STATUS_PENDING)
+        ->generation_mode->toBe(Prompt::GENERATION_MODE_AUTO)
+        ->source_idea->toContain('matte black perfume bottle')
+        ->thumbnail_path->toBeNull()
+        ->reference_image_path->toBeNull();
+
+    Bus::assertDispatched(
+        GenerateAutoPromptJob::class,
+        fn (GenerateAutoPromptJob $job): bool => $job->prompt->is($prompt),
+    );
+});
+
+test('auto prompt validation rejects missing idea and category', function (): void {
+    Bus::fake();
+
+    $admin = User::factory()->admin()->create();
+
+    $this->actingAs($admin)
+        ->from('/admin/prompts')
+        ->post('/admin/prompts/auto', [
+            'idea' => '',
+            'category' => 'invalid',
+        ])
+        ->assertRedirect('/admin/prompts')
+        ->assertSessionHasErrors(['idea', 'category']);
+
+    expect(Prompt::query()->count())->toBe(0);
+    Bus::assertNotDispatched(GenerateAutoPromptJob::class);
+});
+
+test('the auto prompt job stores structured output and generated thumbnail', function (): void {
+    config([
+        'ai.prompt_library.provider' => 'anthropic',
+        'ai.prompt_library.model' => 'claude-sonnet-test',
+        'ai.providers.anthropic.key' => 'test-key',
+        'ai.prompt_library.image_provider' => 'gemini',
+        'ai.prompt_library.image_model' => 'imagen-test',
+        'ai.providers.gemini.key' => 'test-key',
+    ]);
+
+    Storage::fake('public');
+
+    $prompt = Prompt::factory()->auto()->pending()->create([
+        'category' => Prompt::CATEGORY_FASHION,
+        'source_idea' => 'Idea: fashion editorial with a replaceable subject',
+        'thumbnail_path' => null,
+        'reference_image_path' => null,
+    ]);
+
+    AutoPromptGeneratorAgent::fake([
+        [
+            'title' => 'Rainy Neon Fashion Editorial',
+            'prompt' => 'Create a fashion editorial image of a replaceable subject in a rainy neon street.',
+            'negative_prompt' => 'text, watermark, blurry hands',
+            'category' => Prompt::CATEGORY_FASHION,
+            'thumbnail_prompt' => 'Rainy neon fashion editorial preview, no text or logo.',
+            'style_notes' => [
+                'subject' => 'A replaceable fashion subject.',
+                'composition' => 'Three-quarter framing with street depth.',
+                'camera_angle' => 'Eye-level portrait lens.',
+                'lighting' => 'Neon rim light and wet reflections.',
+                'background' => 'Rainy city street.',
+                'colors' => 'Cyan, magenta, black.',
+                'mood' => 'Cinematic and confident.',
+                'quality' => 'High-end editorial finish.',
+                'dynamic_subject_guidance' => 'Swap in the user-provided person while preserving pose and lighting.',
+            ],
+        ],
+    ])->preventStrayPrompts();
+
+    Image::fake([
+        base64_encode('fake-thumbnail-image'),
+    ])->preventStrayImages();
+
+    app()->call([(new GenerateAutoPromptJob($prompt)), 'handle']);
+
+    $prompt->refresh();
+
+    expect($prompt)
+        ->status->toBe(Prompt::STATUS_COMPLETED)
+        ->generation_mode->toBe(Prompt::GENERATION_MODE_AUTO)
+        ->title->toBe('Rainy Neon Fashion Editorial')
+        ->prompt->toContain('rainy neon street')
+        ->negative_prompt->toBe('text, watermark, blurry hands')
+        ->category->toBe(Prompt::CATEGORY_FASHION)
+        ->thumbnail_prompt->toBe('Rainy neon fashion editorial preview, no text or logo.')
+        ->ai_provider->toBe('anthropic')
+        ->ai_model->toBe('claude-sonnet-test')
+        ->generated_at->not->toBeNull()
+        ->thumbnail_path->not->toBeNull();
+
+    expect($prompt->style_notes)
+        ->toHaveKey('dynamic_subject_guidance', 'Swap in the user-provided person while preserving pose and lighting.');
+
+    Storage::disk('public')->assertExists($prompt->thumbnail_path);
+
+    AutoPromptGeneratorAgent::assertPrompted(
+        fn ($prompt): bool => $prompt->contains('Create an auto generated prompt library entry'),
+    );
+
+    Image::assertGenerated(
+        fn ($prompt): bool => $prompt->contains('Rainy neon fashion editorial preview') && $prompt->isPortrait(),
+    );
+});
+
+test('the auto prompt job marks failed text ai calls', function (): void {
+    config([
+        'ai.prompt_library.provider' => 'anthropic',
+        'ai.providers.anthropic.key' => 'test-key',
+        'ai.prompt_library.image_provider' => 'gemini',
+        'ai.providers.gemini.key' => 'test-key',
+    ]);
+
+    $prompt = Prompt::factory()->auto()->pending()->create([
+        'source_idea' => 'Idea: product prompt',
+        'thumbnail_path' => null,
+        'reference_image_path' => null,
+    ]);
+
+    AutoPromptGeneratorAgent::fake(function (): never {
+        throw new RuntimeException('text model unavailable');
+    })->preventStrayPrompts();
+
+    Image::fake()->preventStrayImages();
+
+    expect(fn () => app()->call([(new GenerateAutoPromptJob($prompt)), 'handle']))
+        ->toThrow(RuntimeException::class, 'text model unavailable');
+
+    $prompt->refresh();
+
+    expect($prompt)
+        ->status->toBe(Prompt::STATUS_FAILED)
+        ->error_message->toBe('text model unavailable');
+
+    Image::assertNothingGenerated();
+});
+
+test('the auto prompt job marks failed thumbnail generation', function (): void {
+    config([
+        'ai.prompt_library.provider' => 'anthropic',
+        'ai.providers.anthropic.key' => 'test-key',
+        'ai.prompt_library.image_provider' => 'gemini',
+        'ai.providers.gemini.key' => 'test-key',
+    ]);
+
+    Storage::fake('public');
+
+    $prompt = Prompt::factory()->auto()->pending()->create([
+        'source_idea' => 'Idea: art prompt',
+        'thumbnail_path' => null,
+        'reference_image_path' => null,
+    ]);
+
+    AutoPromptGeneratorAgent::fake([
+        [
+            'title' => 'Surreal Art Frame',
+            'prompt' => 'Create a surreal art image with glowing glass architecture.',
+            'negative_prompt' => 'text, watermark',
+            'category' => Prompt::CATEGORY_ART,
+            'thumbnail_prompt' => 'Surreal glass architecture thumbnail.',
+            'style_notes' => [
+                'subject' => 'Glass architecture.',
+                'composition' => 'Central symmetrical scene.',
+                'camera_angle' => 'Wide angle.',
+                'lighting' => 'Soft luminous light.',
+                'background' => 'Dreamlike skyline.',
+                'colors' => 'Pearl, cyan, violet.',
+                'mood' => 'Surreal and calm.',
+                'quality' => 'Polished digital art.',
+                'dynamic_subject_guidance' => 'Replace the main subject while preserving the atmosphere.',
+            ],
+        ],
+    ])->preventStrayPrompts();
+
+    Image::fake(function (): never {
+        throw new RuntimeException('thumbnail model unavailable');
+    })->preventStrayImages();
+
+    expect(fn () => app()->call([(new GenerateAutoPromptJob($prompt)), 'handle']))
+        ->toThrow(RuntimeException::class, 'thumbnail model unavailable');
+
+    $prompt->refresh();
+
+    expect($prompt)
+        ->status->toBe(Prompt::STATUS_FAILED)
+        ->error_message->toBe('thumbnail model unavailable')
+        ->thumbnail_path->toBeNull();
+});
+
+test('public library shows completed auto prompts only', function (): void {
+    $completed = Prompt::factory()->auto()->create([
+        'title' => 'Completed auto prompt',
+        'status' => Prompt::STATUS_COMPLETED,
+        'thumbnail_path' => 'prompts/thumbnails/auto-completed.png',
+        'reference_image_path' => null,
+    ]);
+
+    Prompt::factory()->auto()->pending()->create([
+        'title' => 'Pending auto prompt',
+        'thumbnail_path' => null,
+        'reference_image_path' => null,
+    ]);
+
+    Prompt::factory()->auto()->failed()->create([
+        'title' => 'Failed auto prompt',
+        'thumbnail_path' => null,
+        'reference_image_path' => null,
+    ]);
+
+    $this->get('/')
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('prompts.data', 1)
+            ->where('prompts.data.0.id', $completed->id)
+            ->where('prompts.data.0.generation_mode', Prompt::GENERATION_MODE_AUTO)
+            ->where('prompts.data.0.reference_image_url', Storage::disk('public')->url('prompts/thumbnails/auto-completed.png')));
+});
+
+test('copy endpoint works for auto prompts', function (): void {
+    $prompt = Prompt::factory()->auto()->create([
+        'status' => Prompt::STATUS_COMPLETED,
+        'copy_count' => 9,
+        'reference_image_path' => null,
+    ]);
+
+    $this->postJson("/prompts/{$prompt->id}/copy")
+        ->assertSuccessful()
+        ->assertJson([
+            'copy_count' => 10,
+        ]);
+
+    expect($prompt->refresh()->copy_count)->toBe(10);
+});
+
+test('admins can regenerate completed auto prompts', function (): void {
+    Bus::fake();
+    Storage::fake('public');
+
+    Storage::disk('public')->put('prompts/thumbnails/old-auto.png', 'old-thumbnail');
+
+    $admin = User::factory()->admin()->create();
+    $prompt = Prompt::factory()->auto()->create([
+        'title' => 'Old auto prompt',
+        'prompt' => 'Old prompt',
+        'thumbnail_prompt' => 'Old thumbnail prompt',
+        'thumbnail_path' => 'prompts/thumbnails/old-auto.png',
+        'status' => Prompt::STATUS_COMPLETED,
+    ]);
+
+    $this->actingAs($admin)
+        ->post("/admin/prompts/{$prompt->id}/regenerate")
+        ->assertRedirect();
+
+    $prompt->refresh();
+
+    expect($prompt)
+        ->title->toBe('Generating prompt')
+        ->prompt->toBeNull()
+        ->thumbnail_prompt->toBeNull()
+        ->thumbnail_path->toBeNull()
+        ->status->toBe(Prompt::STATUS_PENDING)
+        ->error_message->toBeNull();
+
+    Storage::disk('public')->assertMissing('prompts/thumbnails/old-auto.png');
+
+    Bus::assertDispatched(
+        GenerateAutoPromptJob::class,
+        fn (GenerateAutoPromptJob $job): bool => $job->prompt->is($prompt),
     );
 });
 

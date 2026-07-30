@@ -1,21 +1,26 @@
 import { Form, Head, Link, router, usePoll } from '@inertiajs/react';
 import {
     AlertCircle,
+    Bot,
     Check,
     CheckCircle2,
     Clock3,
     Copy,
+    ImageIcon,
     Images,
     LoaderCircle,
     RefreshCw,
     Search,
     Trash2,
     UploadCloud,
+    WandSparkles,
     X,
 } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import AdminPromptController from '@/actions/App/Http/Controllers/AdminPromptController';
+import { PromptImagePlaceholder } from '@/components/prompts/prompt-image-placeholder';
+import { categoryLabels } from '@/components/prompts/prompt-library-config';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,6 +39,7 @@ import type {
     AdminPromptItem,
     Paginated,
     PromptAiConfiguration,
+    PromptCategory,
     PromptStatus,
     PromptStatusSummary,
 } from '@/types';
@@ -47,6 +53,7 @@ type Props = {
     };
     summary: PromptStatusSummary;
     aiConfiguration: PromptAiConfiguration;
+    imageAiConfiguration: PromptAiConfiguration;
     requiresPolling: boolean;
 };
 
@@ -57,15 +64,20 @@ const statusLabels: Record<PromptStatus, string> = {
     failed: 'Failed',
 };
 
+const promptCategories = Object.keys(categoryLabels) as PromptCategory[];
+
 export default function AdminPrompts({
     prompts,
     statuses,
     filters,
     summary,
     aiConfiguration,
+    imageAiConfiguration,
     requiresPolling,
 }: Props) {
     const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+    const [autoCategory, setAutoCategory] =
+        useState<PromptCategory>('portrait');
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState<PromptStatus | 'all'>(
         filters.status ?? 'all',
@@ -228,6 +240,21 @@ export default function AdminPrompts({
                     </Alert>
                 )}
 
+                {!imageAiConfiguration.is_configured && (
+                    <Alert className="border-sky-200 bg-sky-50 text-sky-950 dark:border-sky-900/70 dark:bg-sky-950/40 dark:text-sky-100">
+                        <ImageIcon />
+                        <AlertTitle>
+                            Thumbnail image provider not configured
+                        </AlertTitle>
+                        <AlertDescription>
+                            <span>
+                                {imageAiConfiguration.message ??
+                                    'Auto prompt thumbnails require OpenAI, Gemini, or xAI image generation credentials.'}
+                            </span>
+                        </AlertDescription>
+                    </Alert>
+                )}
+
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                     {summaryItems.map((item) => {
                         const Icon = item.icon;
@@ -250,106 +277,115 @@ export default function AdminPrompts({
                     })}
                 </div>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Reference uploads</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Form
-                            {...AdminPromptController.store.form()}
-                            resetOnSuccess
-                            onSuccess={() => setSelectedFiles([])}
-                            className="grid gap-4"
-                        >
-                            {({ errors, processing, progress }) => {
-                                const imageErrors = Object.entries(errors)
-                                    .filter(([key]) =>
-                                        key.startsWith('images.'),
-                                    )
-                                    .map(([, value]) => value);
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.95fr)]">
+                    <AutoGeneratePromptPanel
+                        autoCategory={autoCategory}
+                        imageAiConfiguration={imageAiConfiguration}
+                        setAutoCategory={setAutoCategory}
+                    />
 
-                                return (
-                                    <>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="images">
-                                                Reference images
-                                            </Label>
-                                            <Input
-                                                id="images"
-                                                name="images[]"
-                                                type="file"
-                                                accept="image/jpeg,image/png,image/webp"
-                                                multiple
-                                                onChange={(event) =>
-                                                    setSelectedFiles(
-                                                        Array.from(
-                                                            event.target.files ??
-                                                                [],
-                                                        ).map(
-                                                            (file) =>
-                                                                file.name,
-                                                        ),
-                                                    )
-                                                }
-                                            />
-                                            {selectedFiles.length > 0 && (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {selectedFiles.map(
-                                                        (file) => (
-                                                            <Badge
-                                                                key={file}
-                                                                variant="outline"
-                                                            >
-                                                                {file}
-                                                            </Badge>
-                                                        ),
-                                                    )}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Reference uploads</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <Form
+                                {...AdminPromptController.store.form()}
+                                resetOnSuccess
+                                onSuccess={() => setSelectedFiles([])}
+                                className="grid gap-4"
+                            >
+                                {({ errors, processing, progress }) => {
+                                    const imageErrors = Object.entries(errors)
+                                        .filter(([key]) =>
+                                            key.startsWith('images.'),
+                                        )
+                                        .map(([, value]) => value);
+
+                                    return (
+                                        <>
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="images">
+                                                    Reference images
+                                                </Label>
+                                                <Input
+                                                    id="images"
+                                                    name="images[]"
+                                                    type="file"
+                                                    accept="image/jpeg,image/png,image/webp"
+                                                    multiple
+                                                    onChange={(event) =>
+                                                        setSelectedFiles(
+                                                            Array.from(
+                                                                event.target
+                                                                    .files ??
+                                                                    [],
+                                                            ).map(
+                                                                (file) =>
+                                                                    file.name,
+                                                            ),
+                                                        )
+                                                    }
+                                                />
+                                                {selectedFiles.length > 0 && (
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {selectedFiles.map(
+                                                            (file) => (
+                                                                <Badge
+                                                                    key={file}
+                                                                    variant="outline"
+                                                                >
+                                                                    {file}
+                                                                </Badge>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {errors.images && (
+                                                    <p className="text-sm text-destructive">
+                                                        {errors.images}
+                                                    </p>
+                                                )}
+                                                {imageErrors.map((error) => (
+                                                    <p
+                                                        key={error}
+                                                        className="text-sm text-destructive"
+                                                    >
+                                                        {error}
+                                                    </p>
+                                                ))}
+                                            </div>
+
+                                            {progress && (
+                                                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                                    <div
+                                                        className="h-full bg-primary transition-all"
+                                                        style={{
+                                                            width: `${progress.percentage}%`,
+                                                        }}
+                                                    />
                                                 </div>
                                             )}
-                                            {errors.images && (
-                                                <p className="text-sm text-destructive">
-                                                    {errors.images}
-                                                </p>
-                                            )}
-                                            {imageErrors.map((error) => (
-                                                <p
-                                                    key={error}
-                                                    className="text-sm text-destructive"
-                                                >
-                                                    {error}
-                                                </p>
-                                            ))}
-                                        </div>
 
-                                        {progress && (
-                                            <div className="h-2 overflow-hidden rounded-full bg-muted">
-                                                <div
-                                                    className="h-full bg-primary transition-all"
-                                                    style={{
-                                                        width: `${progress.percentage}%`,
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-
-                                        <Button
-                                            type="submit"
-                                            className="w-fit"
-                                            disabled={processing}
-                                        >
-                                            {processing ? (
-                                                <LoaderCircle className="animate-spin" />
-                                            ) : (
-                                                <UploadCloud />
-                                            )}
-                                            Upload
-                                        </Button>
-                                    </>
-                                );
-                            }}
-                        </Form>
-                    </CardContent>
-                </Card>
+                                            <Button
+                                                type="submit"
+                                                className="w-fit"
+                                                disabled={processing}
+                                            >
+                                                {processing ? (
+                                                    <LoaderCircle className="animate-spin" />
+                                                ) : (
+                                                    <UploadCloud />
+                                                )}
+                                                Upload
+                                            </Button>
+                                        </>
+                                    );
+                                }}
+                            </Form>
+                        </CardContent>
+                    </Card>
+                </div>
 
                 {prompts.data.length > 0 ? (
                     <div className="grid gap-4 lg:grid-cols-2">
@@ -376,25 +412,256 @@ export default function AdminPrompts({
     );
 }
 
+function AutoGeneratePromptPanel({
+    autoCategory,
+    imageAiConfiguration,
+    setAutoCategory,
+}: {
+    autoCategory: PromptCategory;
+    imageAiConfiguration: PromptAiConfiguration;
+    setAutoCategory: (category: PromptCategory) => void;
+}) {
+    return (
+        <Card className="overflow-hidden">
+            <CardHeader className="gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                        <CardTitle className="flex items-center gap-2">
+                            <WandSparkles className="size-5" />
+                            Auto Generate Prompt
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            Create a prompt and thumbnail from a written
+                            creative brief.
+                        </p>
+                    </div>
+                    <Badge
+                        variant="outline"
+                        className={
+                            imageAiConfiguration.is_configured
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-300'
+                        }
+                    >
+                        <Bot className="size-3.5" />
+                        {imageAiConfiguration.is_configured
+                            ? 'Image AI ready'
+                            : 'Image AI missing'}
+                    </Badge>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <Form
+                    {...AdminPromptController.storeAuto.form()}
+                    resetOnSuccess
+                    onSuccess={() => setAutoCategory('portrait')}
+                    className="grid gap-4"
+                >
+                    {({ errors, processing }) => (
+                        <>
+                            <input
+                                type="hidden"
+                                name="category"
+                                value={autoCategory}
+                            />
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="idea">Topic or idea</Label>
+                                <textarea
+                                    id="idea"
+                                    name="idea"
+                                    rows={4}
+                                    className="min-h-28 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    placeholder="Example: cinematic portrait prompt for a replaceable subject in a rainy neon street"
+                                />
+                                {errors.idea && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.idea}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="grid gap-2">
+                                    <Label>Category</Label>
+                                    <Select
+                                        value={autoCategory}
+                                        onValueChange={(value) =>
+                                            setAutoCategory(
+                                                value as PromptCategory,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {promptCategories.map(
+                                                (category) => (
+                                                    <SelectItem
+                                                        key={category}
+                                                        value={category}
+                                                    >
+                                                        {
+                                                            categoryLabels[
+                                                                category
+                                                            ]
+                                                        }
+                                                    </SelectItem>
+                                                ),
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.category && (
+                                        <p className="text-sm text-destructive">
+                                            {errors.category}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="visual_style">
+                                        Visual style
+                                    </Label>
+                                    <Input
+                                        id="visual_style"
+                                        name="visual_style"
+                                        placeholder="Editorial, cinematic, clean commercial"
+                                    />
+                                    {errors.visual_style && (
+                                        <p className="text-sm text-destructive">
+                                            {errors.visual_style}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <AdminInput
+                                    error={errors.subject}
+                                    id="subject"
+                                    label="Subject"
+                                    placeholder="Replaceable person, product, or scene"
+                                />
+                                <AdminInput
+                                    error={errors.mood}
+                                    id="mood"
+                                    label="Mood"
+                                    placeholder="Elegant, bold, calm, surreal"
+                                />
+                                <AdminInput
+                                    error={errors.lighting}
+                                    id="lighting"
+                                    label="Lighting"
+                                    placeholder="Soft window light, neon rim light"
+                                />
+                                <AdminInput
+                                    error={errors.camera_notes}
+                                    id="camera_notes"
+                                    label="Camera notes"
+                                    placeholder="85mm portrait, low angle, macro"
+                                />
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <AdminInput
+                                    error={errors.target_model_notes}
+                                    id="target_model_notes"
+                                    label="Target model notes"
+                                    placeholder="Midjourney, Flux, Imagen, DALL-E"
+                                />
+                                <AdminInput
+                                    error={errors.negative_notes}
+                                    id="negative_notes"
+                                    label="Negative notes"
+                                    placeholder="Avoid text, watermark, blur"
+                                />
+                            </div>
+
+                            <Button
+                                type="submit"
+                                className="w-fit"
+                                disabled={processing}
+                            >
+                                {processing ? (
+                                    <LoaderCircle className="animate-spin" />
+                                ) : (
+                                    <WandSparkles />
+                                )}
+                                Generate with AI
+                            </Button>
+                        </>
+                    )}
+                </Form>
+            </CardContent>
+        </Card>
+    );
+}
+
+function AdminInput({
+    error,
+    id,
+    label,
+    placeholder,
+}: {
+    error?: string;
+    id: string;
+    label: string;
+    placeholder: string;
+}) {
+    return (
+        <div className="grid gap-2">
+            <Label htmlFor={id}>{label}</Label>
+            <Input id={id} name={id} placeholder={placeholder} />
+            {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+    );
+}
+
 function AdminPromptCard({ prompt }: { prompt: AdminPromptItem }) {
     const [copiedText, copy] = useClipboard();
     const promptText = prompt.prompt ?? '';
+    const canRegenerate =
+        prompt.status === 'failed' ||
+        (prompt.generation_mode === 'auto' && prompt.status === 'completed');
 
     return (
         <Card className="overflow-hidden py-0">
             <div className="grid sm:grid-cols-[13rem_1fr]">
-                <img
-                    src={prompt.thumbnail_url}
-                    alt={prompt.title}
-                    className="aspect-[4/3] h-full w-full object-cover"
-                    loading="lazy"
-                />
+                {prompt.thumbnail_url ? (
+                    <img
+                        src={prompt.thumbnail_url}
+                        alt={prompt.title}
+                        className="aspect-[4/3] h-full w-full object-cover"
+                        loading="lazy"
+                    />
+                ) : (
+                    <PromptImagePlaceholder
+                        compact
+                        className="aspect-[4/3] h-full w-full"
+                    />
+                )}
 
                 <CardContent className="flex min-h-64 flex-col gap-4 p-4">
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
                                 <StatusBadge status={prompt.status} />
+                                <Badge variant="outline">
+                                    {prompt.generation_mode === 'auto' ? (
+                                        <WandSparkles className="size-3" />
+                                    ) : prompt.generation_mode ===
+                                      'imported' ? (
+                                        <Bot className="size-3" />
+                                    ) : (
+                                        <ImageIcon className="size-3" />
+                                    )}
+                                    {prompt.generation_mode === 'auto'
+                                        ? 'Auto'
+                                        : prompt.generation_mode === 'imported'
+                                          ? 'Imported'
+                                          : 'Reference'}
+                                </Badge>
                                 {prompt.category && (
                                     <Badge variant="secondary">
                                         {prompt.category}
@@ -412,12 +679,16 @@ function AdminPromptCard({ prompt }: { prompt: AdminPromptItem }) {
                         </div>
 
                         <div className="flex shrink-0 gap-1">
-                            {prompt.status === 'failed' && (
+                            {canRegenerate && (
                                 <Button
                                     asChild
                                     variant="outline"
                                     size="icon"
-                                    title="Retry"
+                                    title={
+                                        prompt.status === 'failed'
+                                            ? 'Retry'
+                                            : 'Regenerate'
+                                    }
                                 >
                                     <Link
                                         href={AdminPromptController.regenerate(
@@ -461,7 +732,9 @@ function AdminPromptCard({ prompt }: { prompt: AdminPromptItem }) {
                         </div>
                     ) : (
                         <p className="line-clamp-4 text-sm leading-6 text-muted-foreground">
-                            {promptText || 'Waiting for AI generation.'}
+                            {promptText ||
+                                prompt.source_idea ||
+                                'Waiting for AI generation.'}
                         </p>
                     )}
 
@@ -482,6 +755,9 @@ function AdminPromptCard({ prompt }: { prompt: AdminPromptItem }) {
                                     ? `${prompt.ai_provider} / ${prompt.ai_model}`
                                     : prompt.ai_provider}
                             </Badge>
+                        )}
+                        {prompt.thumbnail_prompt && (
+                            <Badge variant="outline">Thumbnail prompt</Badge>
                         )}
                     </div>
                 </CardContent>

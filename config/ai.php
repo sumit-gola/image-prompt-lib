@@ -24,6 +24,9 @@ return [
         'provider' => env('PROMPT_LIBRARY_AI_PROVIDER', 'openai'),
         'model' => env('PROMPT_LIBRARY_AI_MODEL'),
         'timeout' => env('PROMPT_LIBRARY_AI_TIMEOUT', 120),
+        'image_provider' => env('PROMPT_LIBRARY_IMAGE_PROVIDER'),
+        'image_model' => env('PROMPT_LIBRARY_IMAGE_MODEL'),
+        'image_timeout' => env('PROMPT_LIBRARY_IMAGE_TIMEOUT', 120),
     ],
 
     /*

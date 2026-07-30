@@ -1,14 +1,8 @@
 import { Head, Link } from '@inertiajs/react';
-import {
-    ArrowLeft,
-    Check,
-    Copy,
-    Eye,
-    Share2,
-    Sparkles,
-} from 'lucide-react';
+import { ArrowLeft, Check, Copy, Eye, Share2, Sparkles } from 'lucide-react';
 import PromptController from '@/actions/App/Http/Controllers/PromptController';
 import { PromptCard } from '@/components/prompts/prompt-card';
+import { PromptImagePlaceholder } from '@/components/prompts/prompt-image-placeholder';
 import {
     categoryBadgeClasses,
     categoryLabels,
@@ -29,10 +23,7 @@ import {
 } from '@/components/ui/tooltip';
 import { usePromptActions } from '@/hooks/use-prompt-actions';
 import { home } from '@/routes';
-import type {
-    PromptCategory,
-    PromptLibraryItem,
-} from '@/types';
+import type { PromptCategory, PromptLibraryItem } from '@/types';
 
 type Props = {
     promptItem: PromptLibraryItem;
@@ -60,6 +51,8 @@ export default function PromptShow({
         shareStatus,
     } = usePromptActions(promptItem);
     const promptText = promptItem.prompt ?? '';
+    const displayImageUrl =
+        promptItem.reference_image_url ?? promptItem.thumbnail_url;
     const shareTitle =
         shareStatus === 'link-copied'
             ? 'Link copied'
@@ -94,7 +87,7 @@ export default function PromptShow({
                     >
                         <Link
                             href={home()}
-                            className="inline-flex items-center gap-2 rounded-full border border-lumen-line bg-white/[0.05] px-3 py-2 transition hover:bg-white/[0.08] hover:text-white"
+                            className="inline-flex items-center gap-2 rounded-full border border-lumen-line bg-white/[0.62] px-3 py-2 shadow-sm transition hover:bg-white hover:text-lumen-text dark:bg-white/[0.05] dark:shadow-none dark:hover:bg-white/[0.08] dark:hover:text-white"
                         >
                             <ArrowLeft className="size-4" />
                             Prompt Library
@@ -108,12 +101,16 @@ export default function PromptShow({
                     <div className="grid gap-6 xl:grid-cols-[minmax(22rem,0.9fr)_minmax(0,1.1fr)]">
                         <section className="space-y-4">
                             <div className="relative overflow-hidden rounded-[1.75rem] border border-lumen-line bg-lumen-panel shadow-lumen-card">
-                                <img
-                                    src={promptItem.reference_image_url}
-                                    alt={promptItem.title}
-                                    className="aspect-[4/5] w-full object-cover md:aspect-[16/13] xl:aspect-[4/5]"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-lumen-obsidian via-transparent to-transparent opacity-80" />
+                                {displayImageUrl ? (
+                                    <img
+                                        src={displayImageUrl}
+                                        alt={promptItem.title}
+                                        className="aspect-[4/5] w-full object-cover md:aspect-[16/13] xl:aspect-[4/5]"
+                                    />
+                                ) : (
+                                    <PromptImagePlaceholder className="aspect-[4/5] w-full md:aspect-[16/13] xl:aspect-[4/5]" />
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/[0.82] via-transparent to-transparent opacity-80" />
                                 <div className="absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-2 p-4">
                                     {promptItem.category && (
                                         <Badge
@@ -127,13 +124,18 @@ export default function PromptShow({
                                             }
                                         </Badge>
                                     )}
-                                    <Badge className="ml-auto rounded-full border-lumen-line bg-lumen-obsidian/[0.74] text-lumen-soft backdrop-blur-xl">
+                                    <Badge className="ml-auto rounded-full border-white/15 bg-black/[0.58] text-white/85 backdrop-blur-xl">
                                         <Eye className="size-3.5" />
-                                        Reference image
+                                        {promptItem.generation_mode === 'auto'
+                                            ? 'Generated thumbnail'
+                                            : promptItem.generation_mode ===
+                                                'imported'
+                                              ? 'Imported image'
+                                              : 'Reference image'}
                                     </Badge>
                                 </div>
                                 <div className="absolute inset-x-0 bottom-0 p-5">
-                                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-lumen-soft">
+                                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-lumen-soft uppercase">
                                         <span>
                                             {formatGeneratedDate(
                                                 promptItem.generated_at,
@@ -154,13 +156,15 @@ export default function PromptShow({
                             </div>
 
                             {promptItem.style_notes && (
-                                <StyleNotesPanel notes={promptItem.style_notes} />
+                                <StyleNotesPanel
+                                    notes={promptItem.style_notes}
+                                />
                             )}
                         </section>
 
                         <section className="space-y-4 xl:sticky xl:top-28 xl:self-start">
-                            <div className="overflow-hidden rounded-[1.75rem] border border-lumen-line bg-lumen-panel/[0.88] text-lumen-text shadow-lumen-card backdrop-blur">
-                                <div className="h-px w-full lumen-scanline" />
+                            <div className="overflow-hidden rounded-[1.75rem] border border-lumen-line bg-white/[0.66] text-lumen-text shadow-lumen-card backdrop-blur-xl dark:bg-lumen-panel/[0.88]">
+                                <div className="lumen-scanline h-px w-full" />
                                 <div className="space-y-6 p-5 sm:p-6 lg:p-7">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <Badge className="rounded-full border-lumen-primary/[0.35] bg-lumen-primary/[0.14] text-lumen-primary-bright">
@@ -169,7 +173,7 @@ export default function PromptShow({
                                         </Badge>
                                         <Badge
                                             variant="outline"
-                                            className="rounded-full border-lumen-line bg-white/[0.05] text-lumen-soft"
+                                            className="rounded-full border-lumen-line bg-white/[0.62] text-lumen-soft shadow-sm dark:bg-white/[0.05] dark:shadow-none"
                                         >
                                             <Copy className="size-3.5" />
                                             {formatCount(copyCount)} copied
@@ -177,7 +181,7 @@ export default function PromptShow({
                                         {promptItem.source_label && (
                                             <Badge
                                                 variant="outline"
-                                                className="rounded-full border-lumen-line bg-white/[0.05] text-lumen-soft"
+                                                className="rounded-full border-lumen-line bg-white/[0.62] text-lumen-soft shadow-sm dark:bg-white/[0.05] dark:shadow-none"
                                             >
                                                 {promptItem.source_label}
                                             </Badge>
@@ -185,7 +189,7 @@ export default function PromptShow({
                                     </div>
 
                                     <div className="space-y-3">
-                                        <h1 className="text-balance text-4xl font-semibold leading-none text-white sm:text-5xl">
+                                        <h1 className="text-4xl leading-none font-semibold text-balance text-lumen-text sm:text-5xl">
                                             {promptItem.title}
                                         </h1>
                                         <p className="max-w-3xl border-l-2 border-lumen-accent/[0.65] pl-4 text-sm leading-7 text-lumen-soft sm:text-base">
@@ -196,7 +200,7 @@ export default function PromptShow({
                                     <div className="grid grid-cols-[minmax(0,1fr)_3rem] gap-2 sm:flex sm:flex-wrap">
                                         <Button
                                             type="button"
-                                            className="h-12 rounded-full bg-lumen-text px-5 text-lumen-obsidian shadow-[0_12px_32px_rgb(247_248_252_/_0.15)] hover:bg-white"
+                                            className="h-12 rounded-full bg-gradient-to-r from-lumen-primary to-lumen-accent px-5 text-white shadow-[0_12px_32px_rgb(124_58_237_/_0.22)] hover:brightness-105"
                                             onClick={() => void copyPrompt()}
                                             disabled={promptText === ''}
                                         >
@@ -217,7 +221,7 @@ export default function PromptShow({
                                                     variant="outline"
                                                     size="icon"
                                                     title={shareTitle}
-                                                    className="h-12 w-12 rounded-full border-lumen-line bg-white/[0.06] text-lumen-text hover:bg-white/[0.12] hover:text-white"
+                                                    className="h-12 w-12 rounded-full border-lumen-line bg-white/[0.68] text-lumen-text shadow-sm hover:bg-white hover:text-lumen-text dark:bg-white/[0.06] dark:shadow-none dark:hover:bg-white/[0.12] dark:hover:text-white"
                                                     onClick={() =>
                                                         void sharePrompt()
                                                     }
@@ -270,17 +274,17 @@ export default function PromptShow({
                         <section className="mt-12">
                             <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                                 <div>
-                                    <p className="mb-2 text-xs font-semibold uppercase text-lumen-accent">
+                                    <p className="mb-2 text-xs font-semibold text-lumen-accent uppercase">
                                         Related prompts
                                     </p>
-                                    <h2 className="text-3xl font-semibold text-white">
+                                    <h2 className="text-3xl font-semibold text-lumen-text">
                                         Continue this visual direction
                                     </h2>
                                 </div>
                                 <Button
                                     asChild
                                     variant="outline"
-                                    className="w-fit rounded-full border-lumen-line bg-white/[0.06] text-lumen-text hover:bg-white/[0.12] hover:text-white"
+                                    className="w-fit rounded-full border-lumen-line bg-white/[0.68] text-lumen-text shadow-sm hover:bg-white hover:text-lumen-text dark:bg-white/[0.06] dark:shadow-none dark:hover:bg-white/[0.12] dark:hover:text-white"
                                 >
                                     <Link href={PromptController.index()}>
                                         View all prompts
@@ -298,10 +302,10 @@ export default function PromptShow({
                         </section>
                     )}
 
-                    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-lumen-line bg-lumen-obsidian/[0.88] p-3 backdrop-blur-xl md:hidden">
+                    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-lumen-line bg-white/[0.84] p-3 shadow-[0_-18px_52px_rgb(15_23_42_/_0.10)] backdrop-blur-xl md:hidden dark:bg-lumen-obsidian/[0.88] dark:shadow-none">
                         <Button
                             type="button"
-                            className="h-12 w-full rounded-full bg-lumen-text text-lumen-obsidian hover:bg-white"
+                            className="h-12 w-full rounded-full bg-gradient-to-r from-lumen-primary to-lumen-accent text-white hover:brightness-105"
                             onClick={() => void copyPrompt()}
                             disabled={promptText === ''}
                         >

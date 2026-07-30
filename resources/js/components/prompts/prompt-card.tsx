@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import { Check, Copy, Crown, Eye, Share2 } from 'lucide-react';
 import PromptController from '@/actions/App/Http/Controllers/PromptController';
+import { PromptImagePlaceholder } from '@/components/prompts/prompt-image-placeholder';
 import {
     categoryBadgeClasses,
     categoryLabels,
@@ -23,13 +24,8 @@ type Props = {
 };
 
 export function PromptCard({ featured = false, prompt }: Props) {
-    const {
-        copiedValue,
-        copyCount,
-        copyPrompt,
-        sharePrompt,
-        shareStatus,
-    } = usePromptActions(prompt);
+    const { copiedValue, copyCount, copyPrompt, sharePrompt, shareStatus } =
+        usePromptActions(prompt);
     const promptText = prompt.prompt ?? '';
     const isCopied = copiedValue === promptText;
     const shareTitle =
@@ -41,7 +37,7 @@ export function PromptCard({ featured = false, prompt }: Props) {
 
     return (
         <article
-            className={`group relative isolate min-w-0 overflow-hidden rounded-[1.35rem] border border-lumen-line bg-lumen-surface/[0.78] text-lumen-text shadow-lumen-card ring-1 ring-white/[0.03] backdrop-blur transition duration-300 hover:-translate-y-1 hover:border-lumen-line-strong hover:bg-lumen-hover/[0.88] hover:shadow-lumen-glow ${featured ? 'lg:row-span-2' : ''}`}
+            className={`group relative isolate min-w-0 overflow-hidden rounded-[1.35rem] border border-lumen-line bg-lumen-surface text-lumen-text shadow-lumen-card ring-1 ring-white/[0.45] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-lumen-line-strong hover:bg-lumen-hover hover:shadow-lumen-glow dark:bg-lumen-surface/[0.78] dark:ring-white/[0.03] dark:hover:bg-lumen-hover/[0.88] ${featured ? 'lg:row-span-2' : ''}`}
         >
             <Link
                 href={PromptController.show(prompt.id)}
@@ -52,13 +48,19 @@ export function PromptCard({ featured = false, prompt }: Props) {
 
             <div className="pointer-events-none relative z-10">
                 <div className="relative overflow-hidden bg-lumen-panel">
-                    <img
-                        src={prompt.thumbnail_url}
-                        alt={prompt.title}
-                        className={`w-full object-cover transition duration-500 group-hover:scale-[1.035] ${featured ? 'aspect-[4/5] lg:aspect-[3/4]' : 'aspect-[4/5]'}`}
-                        loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-lumen-obsidian via-lumen-obsidian/[0.18] to-transparent opacity-[0.86]" />
+                    {prompt.thumbnail_url ? (
+                        <img
+                            src={prompt.thumbnail_url}
+                            alt={prompt.title}
+                            className={`w-full object-cover transition duration-500 group-hover:scale-[1.035] ${featured ? 'aspect-[4/5] lg:aspect-[3/4]' : 'aspect-[4/5]'}`}
+                            loading="lazy"
+                        />
+                    ) : (
+                        <PromptImagePlaceholder
+                            className={`w-full ${featured ? 'aspect-[4/5] lg:aspect-[3/4]' : 'aspect-[4/5]'}`}
+                        />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/[0.86] via-black/[0.16] to-transparent opacity-[0.86]" />
                     <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
                         {prompt.category && (
                             <Badge
@@ -68,7 +70,7 @@ export function PromptCard({ featured = false, prompt }: Props) {
                                 {categoryLabels[prompt.category]}
                             </Badge>
                         )}
-                        <span className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-full border border-white/12 bg-lumen-obsidian/[0.74] px-2.5 text-xs font-semibold text-lumen-soft backdrop-blur-xl">
+                        <span className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-full border border-white/15 bg-black/[0.58] px-2.5 text-xs font-semibold text-white/85 backdrop-blur-xl">
                             <Copy className="size-3.5" />
                             {formatCount(copyCount)}
                         </span>
@@ -81,11 +83,11 @@ export function PromptCard({ featured = false, prompt }: Props) {
                                     {prompt.model_label}
                                 </span>
                             )}
-                            <span className="rounded-full border border-white/12 bg-white/[0.09] px-2.5 py-1 text-[11px] font-semibold uppercase text-lumen-soft">
+                            <span className="rounded-full border border-white/15 bg-white/[0.16] px-2.5 py-1 text-[11px] font-semibold text-white/80 uppercase backdrop-blur">
                                 {formatGeneratedDate(prompt.generated_at)}
                             </span>
                         </div>
-                        <h2 className="line-clamp-2 text-xl font-semibold leading-tight text-balance text-white">
+                        <h2 className="line-clamp-2 text-xl leading-tight font-semibold text-balance text-white">
                             {prompt.title}
                         </h2>
                     </div>
@@ -93,7 +95,7 @@ export function PromptCard({ featured = false, prompt }: Props) {
 
                 <div className="grid min-h-[13.5rem] gap-4 p-4">
                     <div className="space-y-3">
-                        <div className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase text-lumen-muted">
+                        <div className="flex min-w-0 items-center gap-2 text-xs font-semibold text-lumen-muted uppercase">
                             <span className="truncate">
                                 {prompt.source_label ?? 'Curated library'}
                             </span>
@@ -111,7 +113,7 @@ export function PromptCard({ featured = false, prompt }: Props) {
                     <div className="pointer-events-auto mt-auto grid grid-cols-[minmax(0,1fr)_2.75rem] gap-2">
                         <Button
                             type="button"
-                            className="h-11 rounded-full bg-lumen-text text-lumen-obsidian shadow-[0_12px_30px_rgb(247_248_252_/_0.16)] hover:bg-white"
+                            className="h-11 rounded-full bg-gradient-to-r from-lumen-primary to-lumen-accent text-white shadow-[0_14px_30px_rgb(124_58_237_/_0.22)] hover:brightness-105"
                             onClick={() => void copyPrompt()}
                             disabled={promptText === ''}
                         >
@@ -126,7 +128,7 @@ export function PromptCard({ featured = false, prompt }: Props) {
                                     variant="outline"
                                     size="icon"
                                     title={shareTitle}
-                                    className="h-11 w-11 rounded-full border-lumen-line bg-white/[0.06] text-lumen-text hover:bg-white/[0.12] hover:text-white"
+                                    className="h-11 w-11 rounded-full border-lumen-line bg-white/[0.72] text-lumen-text shadow-sm hover:bg-white hover:text-lumen-text dark:bg-white/[0.06] dark:shadow-none dark:hover:bg-white/[0.12] dark:hover:text-white"
                                     onClick={() => void sharePrompt()}
                                 >
                                     {shareStatus === 'link-copied' ? (

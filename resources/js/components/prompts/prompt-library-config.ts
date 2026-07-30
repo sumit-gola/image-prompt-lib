@@ -37,9 +37,10 @@ export const categoryBadgeClasses: Record<PromptCategory, string> = {
         'border-lumen-accent/[0.35] bg-lumen-accent/[0.12] text-lumen-accent',
     fashion:
         'border-lumen-premium/[0.35] bg-lumen-premium/[0.14] text-lumen-premium',
-    lifestyle: 'border-amber-300/[0.35] bg-amber-300/[0.12] text-amber-200',
-    art: 'border-sky-300/[0.35] bg-sky-400/[0.12] text-sky-200',
-    other: 'border-white/15 bg-white/10 text-lumen-soft',
+    lifestyle:
+        'border-amber-300/[0.45] bg-amber-300/[0.16] text-amber-700 dark:text-amber-200',
+    art: 'border-sky-300/[0.45] bg-sky-400/[0.14] text-sky-700 dark:text-sky-200',
+    other: 'border-lumen-line bg-white/[0.58] text-lumen-soft dark:border-white/15 dark:bg-white/10',
 };
 
 export const sortLabels: Record<PromptSort, string> = {

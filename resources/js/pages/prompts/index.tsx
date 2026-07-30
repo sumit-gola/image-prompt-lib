@@ -17,6 +17,7 @@ import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import PromptController from '@/actions/App/Http/Controllers/PromptController';
 import { PromptCard } from '@/components/prompts/prompt-card';
+import { PromptImagePlaceholder } from '@/components/prompts/prompt-image-placeholder';
 import {
     buildPromptQuery,
     categoryAccents,
@@ -167,7 +168,7 @@ export default function PromptLibrary({
                         />
 
                         {prompts.data.length > 0 ? (
-                            <div className="grid grid-cols-1 gap-4 min-[560px]:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-5">
+                            <div className="grid grid-cols-1 gap-4 min-[560px]:grid-cols-2 min-[1800px]:grid-cols-5 lg:grid-cols-3 2xl:grid-cols-4">
                                 {prompts.data.map((prompt, index) => (
                                     <PromptCard
                                         key={prompt.id}
@@ -242,17 +243,18 @@ function HeroSection({
     totalCopies: number;
 }) {
     return (
-        <section className="lumen-grain relative isolate overflow-hidden rounded-[1.75rem] border border-lumen-line bg-lumen-panel/[0.86] shadow-lumen-card">
+        <section className="lumen-grain relative isolate overflow-hidden rounded-[1.75rem] border border-lumen-line bg-white/[0.62] shadow-lumen-card backdrop-blur-xl dark:bg-lumen-panel/[0.86]">
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgb(255_255_255_/_0.78),rgb(237_233_254_/_0.44)_45%,rgb(219_234_254_/_0.30))] dark:bg-[linear-gradient(135deg,rgb(255_255_255_/_0.04),transparent_46%,rgb(34_211_238_/_0.05))]" />
             <div className="relative z-10 grid gap-7 p-4 sm:p-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(24rem,0.9fr)] lg:p-8 xl:p-10">
                 <div className="flex min-w-0 flex-col justify-between gap-8">
                     <div className="space-y-6">
-                        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-lumen-primary/[0.35] bg-lumen-primary/[0.12] px-3 py-2 text-xs font-semibold uppercase text-lumen-primary-bright">
-                            <span className="size-2 rounded-full bg-lumen-accent motion-safe:lumen-pulse" />
+                        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-lumen-primary/[0.35] bg-lumen-primary/[0.12] px-3 py-2 text-xs font-semibold text-lumen-primary-bright uppercase">
+                            <span className="motion-safe:lumen-pulse size-2 rounded-full bg-lumen-accent" />
                             Curated and tested AI prompts
                         </div>
 
                         <div className="max-w-4xl space-y-4">
-                            <h1 className="text-balance text-4xl font-semibold leading-[0.96] text-white sm:text-6xl xl:text-7xl">
+                            <h1 className="text-4xl leading-[0.96] font-semibold text-balance text-lumen-text sm:text-6xl xl:text-7xl">
                                 The creative prompt library for your next
                                 impossible image.
                             </h1>
@@ -266,7 +268,7 @@ function HeroSection({
 
                         <form
                             onSubmit={onSearch}
-                            className="grid max-w-3xl gap-3 rounded-[1.35rem] border border-lumen-line-strong bg-white/[0.07] p-2 shadow-[inset_0_1px_0_rgb(255_255_255_/_0.08)] sm:grid-cols-[minmax(0,1fr)_auto]"
+                            className="grid max-w-3xl gap-3 rounded-[1.35rem] border border-lumen-line-strong bg-white/[0.68] p-2 shadow-[inset_0_1px_0_rgb(255_255_255_/_0.88),0_18px_60px_rgb(124_58_237_/_0.12)] backdrop-blur sm:grid-cols-[minmax(0,1fr)_auto] dark:bg-white/[0.07] dark:shadow-[inset_0_1px_0_rgb(255_255_255_/_0.08)]"
                         >
                             <div className="relative min-w-0">
                                 <Search className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-lumen-accent" />
@@ -275,13 +277,13 @@ function HeroSection({
                                     onChange={(event) =>
                                         setSearch(event.target.value)
                                     }
-                                    className="h-14 rounded-full border-transparent bg-lumen-obsidian/[0.72] pl-12 text-base text-lumen-text shadow-none placeholder:text-lumen-muted focus-visible:ring-lumen-accent/[0.45]"
+                                    className="h-14 rounded-full border-transparent bg-white/[0.82] pl-12 text-base text-lumen-text shadow-none placeholder:text-lumen-muted focus-visible:ring-lumen-accent/[0.45] dark:bg-lumen-obsidian/[0.72]"
                                     placeholder="Search cinematic portraits, product photography, anime styles..."
                                 />
                             </div>
                             <Button
                                 type="submit"
-                                className="h-14 rounded-full bg-lumen-primary px-6 text-base font-semibold text-white hover:bg-lumen-primary-bright"
+                                className="h-14 rounded-full bg-gradient-to-r from-lumen-primary to-lumen-accent px-6 text-base font-semibold text-white shadow-[0_14px_36px_rgb(124_58_237_/_0.24)] hover:brightness-105"
                             >
                                 Explore Prompts
                                 <ArrowRight />
@@ -305,7 +307,11 @@ function HeroSection({
                             )}
                             {category !== 'all' && (
                                 <HeroChip
-                                    href={promptLibraryHref(search, category, sort)}
+                                    href={promptLibraryHref(
+                                        search,
+                                        category,
+                                        sort,
+                                    )}
                                     label={`${categoryLabels[category]} board`}
                                 />
                             )}
@@ -349,12 +355,12 @@ function HeroImageStack({
 }) {
     if (!featuredPrompt) {
         return (
-            <div className="grid min-h-[26rem] place-items-center rounded-[1.5rem] border border-dashed border-lumen-line bg-white/[0.04] p-8 text-center">
+            <div className="grid min-h-[26rem] place-items-center rounded-[1.5rem] border border-dashed border-lumen-line bg-white/[0.52] p-8 text-center dark:bg-white/[0.04]">
                 <div className="max-w-xs space-y-3">
                     <span className="mx-auto grid size-14 place-items-center rounded-2xl border border-lumen-line bg-lumen-surface text-lumen-accent">
                         <ImageIcon className="size-6" />
                     </span>
-                    <p className="text-lg font-semibold text-white">
+                    <p className="text-lg font-semibold text-lumen-text">
                         Prompt images appear here
                     </p>
                     <p className="text-sm leading-6 text-lumen-muted">
@@ -368,26 +374,35 @@ function HeroImageStack({
 
     return (
         <div className="relative min-h-[28rem] lg:min-h-full">
-            <div className="absolute inset-4 rounded-[2rem] border border-lumen-primary/[0.24] bg-lumen-primary/[0.06] blur-2xl" />
+            <div className="absolute inset-4 rounded-[2rem] border border-lumen-primary/[0.24] bg-lumen-primary/[0.10] blur-2xl dark:bg-lumen-primary/[0.06]" />
             <Link
                 href={PromptController.show(featuredPrompt.id)}
                 className="group absolute inset-y-0 left-0 w-[78%] overflow-hidden rounded-[1.5rem] border border-lumen-line-strong bg-lumen-surface shadow-lumen-card focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lumen-accent"
                 prefetch
             >
-                <img
-                    src={featuredPrompt.reference_image_url}
-                    alt={featuredPrompt.title}
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-lumen-obsidian via-lumen-obsidian/[0.14] to-transparent" />
+                {featuredPrompt.reference_image_url ||
+                featuredPrompt.thumbnail_url ? (
+                    <img
+                        src={
+                            featuredPrompt.reference_image_url ??
+                            featuredPrompt.thumbnail_url ??
+                            ''
+                        }
+                        alt={featuredPrompt.title}
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                    />
+                ) : (
+                    <PromptImagePlaceholder className="h-full w-full" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/[0.86] via-black/[0.14] to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-5">
                     <Badge className="mb-3 rounded-full border-lumen-accent/[0.32] bg-lumen-accent/[0.12] text-lumen-accent">
                         Featured prompt
                     </Badge>
-                    <h2 className="line-clamp-2 text-2xl font-semibold leading-tight text-white">
+                    <h2 className="line-clamp-2 text-2xl leading-tight font-semibold text-white">
                         {featuredPrompt.title}
                     </h2>
-                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-lumen-soft">
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/78">
                         {featuredPrompt.prompt_preview}
                     </p>
                 </div>
@@ -400,15 +415,19 @@ function HeroImageStack({
                     className={`motion-safe:lumen-float group absolute right-0 w-[48%] overflow-hidden rounded-2xl border border-lumen-line bg-lumen-panel shadow-lumen-card transition hover:-translate-y-1 hover:border-lumen-line-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lumen-accent ${index === 0 ? 'top-8' : 'bottom-8 [animation-delay:350ms]'}`}
                     prefetch
                 >
-                    <img
-                        src={prompt.thumbnail_url}
-                        alt={prompt.title}
-                        className="aspect-[4/5] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
-                        loading="lazy"
-                    />
+                    {prompt.thumbnail_url ? (
+                        <img
+                            src={prompt.thumbnail_url}
+                            alt={prompt.title}
+                            className="aspect-[4/5] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
+                            loading="lazy"
+                        />
+                    ) : (
+                        <PromptImagePlaceholder className="aspect-[4/5] w-full" />
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/[0.84] via-black/[0.08] to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 p-3">
-                        <p className="line-clamp-2 text-sm font-semibold leading-5 text-white">
+                        <p className="line-clamp-2 text-sm leading-5 font-semibold text-white">
                             {prompt.title}
                         </p>
                     </div>
@@ -428,14 +447,14 @@ function HeroMetric({
     value: string;
 }) {
     return (
-        <div className="min-w-0 rounded-2xl border border-lumen-line bg-white/[0.05] p-3">
+        <div className="min-w-0 rounded-2xl border border-lumen-line bg-white/[0.58] p-3 shadow-sm dark:bg-white/[0.05] dark:shadow-none">
             <div className="mb-2 flex items-center justify-between gap-2 text-lumen-muted">
                 <span className="truncate text-xs font-semibold uppercase">
                     {label}
                 </span>
                 {icon}
             </div>
-            <p className="text-2xl font-semibold leading-none text-white">
+            <p className="text-2xl leading-none font-semibold text-lumen-text">
                 {value}
             </p>
         </div>
@@ -452,7 +471,7 @@ function HeroChip({
     return (
         <Link
             href={href}
-            className="rounded-full border border-lumen-line bg-white/[0.06] px-3.5 py-2 text-sm font-semibold text-lumen-soft transition hover:border-lumen-accent/[0.45] hover:bg-lumen-accent/[0.10] hover:text-white"
+            className="rounded-full border border-lumen-line bg-white/[0.62] px-3.5 py-2 text-sm font-semibold text-lumen-soft shadow-sm transition hover:border-lumen-accent/[0.45] hover:bg-white hover:text-lumen-text dark:bg-white/[0.06] dark:shadow-none dark:hover:bg-lumen-accent/[0.10] dark:hover:text-white"
             preserveScroll
             preserveState
         >
@@ -473,8 +492,8 @@ function TrendingSearches({
     }
 
     return (
-        <section className="mt-5 flex min-w-0 items-center gap-3 overflow-x-auto rounded-[1.25rem] border border-lumen-line bg-lumen-panel/[0.72] p-2">
-            <span className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white/[0.06] px-3 py-2 text-xs font-semibold uppercase text-lumen-muted">
+        <section className="mt-5 flex min-w-0 items-center gap-3 overflow-x-auto rounded-[1.25rem] border border-lumen-line bg-white/[0.58] p-2 shadow-sm backdrop-blur dark:bg-lumen-panel/[0.72] dark:shadow-none">
+            <span className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white/[0.70] px-3 py-2 text-xs font-semibold text-lumen-muted uppercase shadow-sm dark:bg-white/[0.06] dark:shadow-none">
                 <TrendingUp className="size-4 text-lumen-accent" />
                 Trending
             </span>
@@ -488,12 +507,12 @@ function TrendingSearches({
                             activeSort,
                         ),
                     })}
-                    className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-lumen-line bg-white/[0.04] px-3.5 text-sm font-semibold text-lumen-soft transition hover:border-lumen-line-strong hover:bg-white/[0.08] hover:text-white"
+                    className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-lumen-line bg-white/[0.58] px-3.5 text-sm font-semibold text-lumen-soft shadow-sm transition hover:border-lumen-line-strong hover:bg-white hover:text-lumen-text dark:bg-white/[0.04] dark:shadow-none dark:hover:bg-white/[0.08] dark:hover:text-white"
                     preserveScroll
                     preserveState
                 >
                     {trend.label}
-                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-lumen-muted">
+                    <span className="rounded-full bg-black/[0.05] px-2 py-0.5 text-[11px] text-lumen-muted dark:bg-white/10">
                         {trend.count}
                     </span>
                 </Link>
@@ -527,7 +546,7 @@ function LibraryToolbar({
         <div className="mb-5 grid gap-4 border-b border-lumen-line pb-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
             <div className="min-w-0 space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="rounded-full border-lumen-line bg-white/[0.08] text-white">
+                    <Badge className="rounded-full border-lumen-line bg-white/[0.70] text-lumen-text shadow-sm dark:bg-white/[0.08] dark:text-white dark:shadow-none">
                         <Filter />
                         Prompt board
                     </Badge>
@@ -560,7 +579,12 @@ function LibraryToolbar({
             </div>
 
             <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
-                <SortTabs category={category} search={search} sort={sort} sorts={sorts} />
+                <SortTabs
+                    category={category}
+                    search={search}
+                    sort={sort}
+                    sorts={sorts}
+                />
                 <div className="flex flex-wrap items-center gap-2">
                     {category !== 'all' && (
                         <Badge
@@ -584,7 +608,7 @@ function LibraryToolbar({
                             variant="ghost"
                             size="sm"
                             onClick={clearFilters}
-                            className="rounded-full text-lumen-soft hover:bg-white/[0.08] hover:text-white"
+                            className="rounded-full text-lumen-soft hover:bg-white hover:text-lumen-text dark:hover:bg-white/[0.08] dark:hover:text-white"
                         >
                             <X />
                             Clear
@@ -610,7 +634,7 @@ function SortTabs({
     const options = sortTabs.filter((option) => sorts.includes(option));
 
     return (
-        <div className="flex w-full gap-1 overflow-x-auto rounded-full border border-lumen-line bg-white/[0.05] p-1 sm:w-fit">
+        <div className="flex w-full gap-1 overflow-x-auto rounded-full border border-lumen-line bg-white/[0.58] p-1 shadow-sm sm:w-fit dark:bg-white/[0.05] dark:shadow-none">
             {options.map((option) => (
                 <Link
                     key={option}
@@ -618,7 +642,7 @@ function SortTabs({
                     className={
                         sort === option
                             ? 'flex h-10 shrink-0 items-center gap-2 rounded-full bg-lumen-text px-3.5 text-sm font-semibold text-lumen-obsidian shadow-sm'
-                            : 'flex h-10 shrink-0 items-center gap-2 rounded-full px-3.5 text-sm font-semibold text-lumen-soft transition hover:bg-white/[0.08] hover:text-white'
+                            : 'flex h-10 shrink-0 items-center gap-2 rounded-full px-3.5 text-sm font-semibold text-lumen-soft transition hover:bg-white hover:text-lumen-text dark:hover:bg-white/[0.08] dark:hover:text-white'
                     }
                     preserveScroll
                     preserveState
@@ -653,14 +677,14 @@ function CategoryButton({
             href={href}
             className={
                 active
-                    ? 'inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-lumen-primary/[0.45] bg-lumen-primary/[0.20] px-4 text-sm font-semibold text-white'
-                    : 'inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-lumen-line bg-white/[0.04] px-4 text-sm font-semibold text-lumen-soft transition hover:border-lumen-line-strong hover:bg-white/[0.08] hover:text-white'
+                    ? 'inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-lumen-primary/[0.45] bg-gradient-to-r from-lumen-primary to-lumen-accent px-4 text-sm font-semibold text-white shadow-[0_10px_28px_rgb(124_58_237_/_0.20)]'
+                    : 'inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-lumen-line bg-white/[0.58] px-4 text-sm font-semibold text-lumen-soft shadow-sm transition hover:border-lumen-line-strong hover:bg-white hover:text-lumen-text dark:bg-white/[0.04] dark:shadow-none dark:hover:bg-white/[0.08] dark:hover:text-white'
             }
             preserveScroll
             preserveState
         >
             {label}
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-lumen-muted">
+            <span className="rounded-full bg-black/[0.05] px-2 py-0.5 text-[11px] text-lumen-muted dark:bg-white/10">
                 {count}
             </span>
         </Link>
@@ -683,14 +707,14 @@ function EmptyState({
     suggestedPrompts: PromptLibraryItem[];
 }) {
     return (
-        <section className="grid gap-8 overflow-hidden rounded-[1.5rem] border border-lumen-line bg-lumen-panel/[0.86] p-5 text-lumen-text shadow-lumen-card lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:p-8">
+        <section className="grid gap-8 overflow-hidden rounded-[1.5rem] border border-lumen-line bg-white/[0.64] p-5 text-lumen-text shadow-lumen-card backdrop-blur-xl lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:p-8 dark:bg-lumen-panel/[0.86]">
             <div className="flex min-w-0 flex-col justify-between gap-8">
                 <div className="space-y-4">
                     <span className="grid size-14 place-items-center rounded-2xl border border-lumen-line bg-lumen-surface text-lumen-accent shadow-lumen-glow">
                         <ImageIcon className="size-6" />
                     </span>
                     <div className="space-y-2">
-                        <h2 className="text-3xl font-semibold leading-tight text-white">
+                        <h2 className="text-3xl leading-tight font-semibold text-lumen-text">
                             {category
                                 ? `No ${categoryLabels[category].toLowerCase()} prompts yet`
                                 : 'No prompts found'}
@@ -707,7 +731,7 @@ function EmptyState({
                         <Button
                             type="button"
                             onClick={clearFilters}
-                            className="rounded-full bg-lumen-text text-lumen-obsidian hover:bg-white"
+                            className="rounded-full bg-gradient-to-r from-lumen-primary to-lumen-accent text-white shadow-[0_12px_32px_rgb(124_58_237_/_0.22)] hover:brightness-105"
                         >
                             <X />
                             Show all prompts
@@ -716,7 +740,7 @@ function EmptyState({
                     <Button
                         asChild
                         variant="outline"
-                        className="rounded-full border-lumen-line bg-white/[0.06] text-lumen-text hover:bg-white/[0.12] hover:text-white"
+                        className="rounded-full border-lumen-line bg-white/[0.68] text-lumen-text shadow-sm hover:bg-white hover:text-lumen-text dark:bg-white/[0.06] dark:shadow-none dark:hover:bg-white/[0.12] dark:hover:text-white"
                     >
                         <Link href={PromptController.index()}>
                             Browse library
@@ -732,17 +756,21 @@ function EmptyState({
                             <Link
                                 key={prompt.id}
                                 href={PromptController.show(prompt.id)}
-                                className="group min-w-0 overflow-hidden rounded-2xl border border-lumen-line bg-white/[0.05] transition hover:-translate-y-0.5 hover:border-lumen-line-strong hover:bg-white/[0.08]"
+                                className="group min-w-0 overflow-hidden rounded-2xl border border-lumen-line bg-white/[0.62] shadow-sm transition hover:-translate-y-0.5 hover:border-lumen-line-strong hover:bg-white dark:bg-white/[0.05] dark:shadow-none dark:hover:bg-white/[0.08]"
                                 prefetch
                             >
-                                <img
-                                    src={prompt.thumbnail_url}
-                                    alt={prompt.title}
-                                    className="aspect-[4/5] w-full object-cover transition group-hover:scale-[1.035]"
-                                    loading="lazy"
-                                />
+                                {prompt.thumbnail_url ? (
+                                    <img
+                                        src={prompt.thumbnail_url}
+                                        alt={prompt.title}
+                                        className="aspect-[4/5] w-full object-cover transition group-hover:scale-[1.035]"
+                                        loading="lazy"
+                                    />
+                                ) : (
+                                    <PromptImagePlaceholder className="aspect-[4/5] w-full" />
+                                )}
                                 <div className="p-3">
-                                    <p className="line-clamp-2 text-sm font-semibold leading-5 text-white">
+                                    <p className="line-clamp-2 text-sm leading-5 font-semibold text-lumen-text">
                                         {prompt.title}
                                     </p>
                                 </div>
@@ -750,7 +778,7 @@ function EmptyState({
                         ))}
                     </div>
                 ) : (
-                    <div className="grid min-h-52 place-items-center rounded-2xl border border-dashed border-lumen-line bg-white/[0.04] p-6 text-center text-sm text-lumen-muted">
+                    <div className="grid min-h-52 place-items-center rounded-2xl border border-dashed border-lumen-line bg-white/[0.52] p-6 text-center text-sm text-lumen-muted dark:bg-white/[0.04]">
                         Completed prompts will appear here after the admin
                         generates them.
                     </div>
@@ -761,14 +789,14 @@ function EmptyState({
                         <Link
                             key={option}
                             href={promptLibraryHref('', option, 'newest')}
-                            className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-lumen-line bg-white/[0.05] px-3 py-2 text-sm font-semibold text-lumen-soft transition hover:bg-white/[0.08] hover:text-white"
+                            className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-lumen-line bg-white/[0.58] px-3 py-2 text-sm font-semibold text-lumen-soft shadow-sm transition hover:bg-white hover:text-lumen-text dark:bg-white/[0.05] dark:shadow-none dark:hover:bg-white/[0.08] dark:hover:text-white"
                             preserveScroll
                             preserveState
                         >
                             <span className="truncate">
                                 {categoryLabels[option]}
                             </span>
-                            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-lumen-muted">
+                            <span className="rounded-full bg-black/[0.05] px-2 py-0.5 text-[11px] text-lumen-muted dark:bg-white/10">
                                 {categoryCounts[option] ?? 0}
                             </span>
                         </Link>
@@ -787,8 +815,7 @@ function Pagination({ prompts }: { prompts: Paginated<PromptLibraryItem> }) {
     return (
         <div className="mt-6 flex flex-col gap-3 border-t border-lumen-line pt-4 text-sm sm:flex-row sm:items-center sm:justify-between">
             <span className="text-lumen-muted">
-                Showing {prompts.from ?? 0}-{prompts.to ?? 0} of{' '}
-                {prompts.total}
+                Showing {prompts.from ?? 0}-{prompts.to ?? 0} of {prompts.total}
             </span>
             <div className="grid grid-cols-2 gap-2 sm:flex">
                 {prompts.prev_page_url ? (
@@ -796,7 +823,7 @@ function Pagination({ prompts }: { prompts: Paginated<PromptLibraryItem> }) {
                         asChild
                         variant="outline"
                         size="sm"
-                        className="rounded-full border-lumen-line bg-white/[0.06] text-lumen-text hover:bg-white/[0.12] hover:text-white"
+                        className="rounded-full border-lumen-line bg-white/[0.68] text-lumen-text shadow-sm hover:bg-white hover:text-lumen-text dark:bg-white/[0.06] dark:shadow-none dark:hover:bg-white/[0.12] dark:hover:text-white"
                     >
                         <Link href={prompts.prev_page_url}>Previous</Link>
                     </Button>
@@ -804,7 +831,7 @@ function Pagination({ prompts }: { prompts: Paginated<PromptLibraryItem> }) {
                     <Button
                         variant="outline"
                         size="sm"
-                        className="rounded-full border-lumen-line bg-white/[0.04] text-lumen-muted"
+                        className="rounded-full border-lumen-line bg-white/[0.46] text-lumen-muted dark:bg-white/[0.04]"
                         disabled
                     >
                         Previous
@@ -815,7 +842,7 @@ function Pagination({ prompts }: { prompts: Paginated<PromptLibraryItem> }) {
                         asChild
                         variant="outline"
                         size="sm"
-                        className="rounded-full border-lumen-line bg-white/[0.06] text-lumen-text hover:bg-white/[0.12] hover:text-white"
+                        className="rounded-full border-lumen-line bg-white/[0.68] text-lumen-text shadow-sm hover:bg-white hover:text-lumen-text dark:bg-white/[0.06] dark:shadow-none dark:hover:bg-white/[0.12] dark:hover:text-white"
                     >
                         <Link href={prompts.next_page_url}>Next</Link>
                     </Button>
@@ -823,7 +850,7 @@ function Pagination({ prompts }: { prompts: Paginated<PromptLibraryItem> }) {
                     <Button
                         variant="outline"
                         size="sm"
-                        className="rounded-full border-lumen-line bg-white/[0.04] text-lumen-muted"
+                        className="rounded-full border-lumen-line bg-white/[0.46] text-lumen-muted dark:bg-white/[0.04]"
                         disabled
                     >
                         Next
@@ -873,26 +900,29 @@ function CollectionsSection({
                         />
                         <div className="relative z-10 flex h-full flex-col justify-between gap-6">
                             <div className="grid grid-cols-3 gap-2">
-                                {collection.thumbnails.slice(0, 3).map((url) => (
-                                    <img
-                                        key={url}
-                                        src={url}
-                                        alt={`${collection.title} collection`}
-                                        className="aspect-[4/5] rounded-2xl object-cover shadow-[0_16px_36px_rgb(0_0_0_/_0.26)] transition group-hover:scale-[1.025]"
-                                        loading="lazy"
-                                    />
-                                ))}
+                                {collection.thumbnails
+                                    .slice(0, 3)
+                                    .map((url) => (
+                                        <img
+                                            key={url}
+                                            src={url}
+                                            alt={`${collection.title} collection`}
+                                            className="aspect-[4/5] rounded-2xl object-cover shadow-[0_16px_36px_rgb(15_23_42_/_0.18)] transition group-hover:scale-[1.025] dark:shadow-[0_16px_36px_rgb(0_0_0_/_0.26)]"
+                                            loading="lazy"
+                                        />
+                                    ))}
                             </div>
                             <div className="space-y-3">
                                 <Badge
                                     variant="outline"
                                     className={`rounded-full ${categoryBadgeClasses[collection.category]}`}
                                 >
-                                    {formatCount(collection.prompt_count)} prompt
+                                    {formatCount(collection.prompt_count)}{' '}
+                                    prompt
                                     {collection.prompt_count === 1 ? '' : 's'}
                                 </Badge>
                                 <div className="space-y-2">
-                                    <h3 className="text-2xl font-semibold text-white">
+                                    <h3 className="text-2xl font-semibold text-lumen-text">
                                         {collection.title}
                                     </h3>
                                     <p className="line-clamp-2 text-sm leading-6 text-lumen-soft">
@@ -975,17 +1005,17 @@ function DirectionTile({
             href={href}
             className={
                 active
-                    ? 'group min-w-0 rounded-[1.25rem] border border-lumen-primary/[0.45] bg-lumen-primary/[0.18] p-4 text-white shadow-lumen-glow'
-                    : 'group min-w-0 rounded-[1.25rem] border border-lumen-line bg-lumen-surface/[0.74] p-4 text-lumen-text transition hover:-translate-y-0.5 hover:border-lumen-line-strong hover:bg-lumen-hover/[0.88]'
+                    ? 'group min-w-0 rounded-[1.25rem] border border-lumen-primary/[0.45] bg-gradient-to-br from-lumen-primary to-lumen-accent p-4 text-white shadow-lumen-glow'
+                    : 'group min-w-0 rounded-[1.25rem] border border-lumen-line bg-lumen-surface p-4 text-lumen-text shadow-sm transition hover:-translate-y-0.5 hover:border-lumen-line-strong hover:bg-lumen-hover dark:bg-lumen-surface/[0.74] dark:shadow-none dark:hover:bg-lumen-hover/[0.88]'
             }
             preserveScroll
             preserveState
         >
             <div className="mb-4 flex items-center justify-between gap-3">
-                <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-lumen-line bg-lumen-obsidian text-lg font-semibold text-lumen-accent">
+                <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-lumen-line bg-white/[0.70] text-lg font-semibold text-lumen-accent shadow-sm dark:bg-lumen-obsidian dark:shadow-none">
                     {label.slice(0, 1)}
                 </span>
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-lumen-muted">
+                <span className="rounded-full bg-black/[0.05] px-2 py-0.5 text-xs text-lumen-muted dark:bg-white/10">
                     {formatCount(count)}
                 </span>
             </div>
@@ -1013,17 +1043,17 @@ function ModelSection({ modelCounts }: { modelCounts: PromptModelCount[] }) {
                     {modelCounts.map((model) => (
                         <div
                             key={model.model}
-                            className="rounded-[1.25rem] border border-lumen-line bg-lumen-surface/[0.74] p-4"
+                            className="rounded-[1.25rem] border border-lumen-line bg-lumen-surface p-4 shadow-sm dark:bg-lumen-surface/[0.74] dark:shadow-none"
                         >
                             <div className="mb-5 flex items-center justify-between gap-3">
                                 <span className="grid size-11 place-items-center rounded-2xl border border-lumen-accent/[0.25] bg-lumen-accent/[0.10] text-lumen-accent">
                                     <Zap className="size-5" />
                                 </span>
-                                <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-lumen-muted">
+                                <span className="rounded-full bg-black/[0.05] px-2 py-0.5 text-xs text-lumen-muted dark:bg-white/10">
                                     {formatCount(model.count)}
                                 </span>
                             </div>
-                            <h3 className="font-mono text-base font-semibold text-white">
+                            <h3 className="font-mono text-base font-semibold text-lumen-text">
                                 {model.label}
                             </h3>
                             <p className="mt-2 text-sm leading-6 text-lumen-muted">
@@ -1034,7 +1064,7 @@ function ModelSection({ modelCounts }: { modelCounts: PromptModelCount[] }) {
                     ))}
                 </div>
             ) : (
-                <div className="rounded-[1.25rem] border border-dashed border-lumen-line bg-white/[0.04] p-6 text-sm text-lumen-muted">
+                <div className="rounded-[1.25rem] border border-dashed border-lumen-line bg-white/[0.52] p-6 text-sm text-lumen-muted dark:bg-white/[0.04]">
                     Model badges will appear after completed prompts include AI
                     model metadata.
                 </div>
@@ -1063,7 +1093,7 @@ function HowItWorks() {
     ];
 
     return (
-        <section className="mt-12 rounded-[1.5rem] border border-lumen-line bg-lumen-panel/[0.78] p-5 shadow-lumen-card sm:p-6 lg:p-8">
+        <section className="mt-12 rounded-[1.5rem] border border-lumen-line bg-white/[0.62] p-5 shadow-lumen-card backdrop-blur-xl sm:p-6 lg:p-8 dark:bg-lumen-panel/[0.78]">
             <SectionHeader
                 eyebrow="Workflow"
                 title="From reference to reusable prompt"
@@ -1073,12 +1103,12 @@ function HowItWorks() {
                 {steps.map((step) => (
                     <div
                         key={step.title}
-                        className="rounded-[1.25rem] border border-lumen-line bg-white/[0.045] p-4"
+                        className="rounded-[1.25rem] border border-lumen-line bg-white/[0.58] p-4 shadow-sm dark:bg-white/[0.045] dark:shadow-none"
                     >
                         <span className="mb-5 grid size-11 place-items-center rounded-2xl border border-lumen-primary/[0.28] bg-lumen-primary/[0.12] text-lumen-primary-bright">
                             {step.icon}
                         </span>
-                        <h3 className="text-lg font-semibold text-white">
+                        <h3 className="text-lg font-semibold text-lumen-text">
                             {step.title}
                         </h3>
                         <p className="mt-2 text-sm leading-6 text-lumen-soft">
@@ -1103,10 +1133,10 @@ function SectionHeader({
     return (
         <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-3xl">
-                <p className="mb-2 text-xs font-semibold uppercase text-lumen-accent">
+                <p className="mb-2 text-xs font-semibold text-lumen-accent uppercase">
                     {eyebrow}
                 </p>
-                <h2 className="text-3xl font-semibold tracking-normal text-white">
+                <h2 className="text-3xl font-semibold tracking-normal text-lumen-text">
                     {title}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-lumen-soft">

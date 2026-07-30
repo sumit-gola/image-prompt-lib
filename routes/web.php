@@ -17,6 +17,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('prompts', [AdminPromptController::class, 'index'])->name('prompts.index');
         Route::post('prompts', [AdminPromptController::class, 'store'])->name('prompts.store');
+        Route::post('prompts/auto', [AdminPromptController::class, 'storeAuto'])->name('prompts.store-auto');
         Route::post('prompts/{prompt}/regenerate', [AdminPromptController::class, 'regenerate'])->name('prompts.regenerate');
         Route::delete('prompts/{prompt}', [AdminPromptController::class, 'destroy'])->name('prompts.destroy');
     });

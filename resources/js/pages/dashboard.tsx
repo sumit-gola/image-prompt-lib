@@ -3,6 +3,7 @@ import {
     AlertTriangle,
     CheckCircle2,
     Clock3,
+    ImageIcon,
     Images,
     LoaderCircle,
     ShieldCheck,
@@ -178,12 +179,18 @@ function RecentPromptCard({ prompt }: { prompt: DashboardPromptItem }) {
     return (
         <Card className="overflow-hidden py-0">
             <div className="grid sm:grid-cols-[9rem_1fr]">
-                <img
-                    src={prompt.thumbnail_url}
-                    alt={prompt.title}
-                    className="aspect-[4/3] h-full w-full object-cover"
-                    loading="lazy"
-                />
+                {prompt.thumbnail_url ? (
+                    <img
+                        src={prompt.thumbnail_url}
+                        alt={prompt.title}
+                        className="aspect-[4/3] h-full w-full object-cover"
+                        loading="lazy"
+                    />
+                ) : (
+                    <div className="grid aspect-[4/3] h-full w-full place-items-center bg-muted text-muted-foreground">
+                        <ImageIcon className="size-5" />
+                    </div>
+                )}
                 <CardContent className="flex min-h-36 flex-col gap-3 p-4">
                     <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge status={prompt.status} />
@@ -232,12 +239,13 @@ function formatDate(value: string | null) {
         return 'Not generated';
     }
 
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
+        timeZone: 'UTC',
     }).format(new Date(value));
 }
 

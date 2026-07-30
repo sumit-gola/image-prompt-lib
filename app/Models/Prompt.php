@@ -16,10 +16,19 @@ use Illuminate\Support\Carbon;
  * @property string $title
  * @property string|null $prompt
  * @property string|null $negative_prompt
- * @property string $thumbnail_path
- * @property string $reference_image_path
+ * @property string|null $thumbnail_prompt
+ * @property string|null $thumbnail_path
+ * @property string|null $reference_image_path
+ * @property string $generation_mode
+ * @property string|null $source_idea
+ * @property string|null $source_site
+ * @property string|null $source_slug
+ * @property string|null $source_url
+ * @property string|null $source_thumbnail_url
+ * @property Carbon|null $source_published_at
+ * @property Carbon|null $source_modified_at
  * @property string|null $category
- * @property array<string, string>|null $style_notes
+ * @property array<string, string|null>|null $style_notes
  * @property string|null $ai_provider
  * @property string|null $ai_model
  * @property string $status
@@ -34,8 +43,17 @@ use Illuminate\Support\Carbon;
     'title',
     'prompt',
     'negative_prompt',
+    'thumbnail_prompt',
     'thumbnail_path',
     'reference_image_path',
+    'generation_mode',
+    'source_idea',
+    'source_site',
+    'source_slug',
+    'source_url',
+    'source_thumbnail_url',
+    'source_published_at',
+    'source_modified_at',
     'category',
     'style_notes',
     'ai_provider',
@@ -54,6 +72,18 @@ class Prompt extends Model
     public const STATUS_COMPLETED = 'completed';
 
     public const STATUS_FAILED = 'failed';
+
+    public const GENERATION_MODE_REFERENCE_IMAGE = 'reference_image';
+
+    public const GENERATION_MODE_AUTO = 'auto';
+
+    public const GENERATION_MODE_IMPORTED = 'imported';
+
+    public const GENERATION_MODES = [
+        self::GENERATION_MODE_REFERENCE_IMAGE,
+        self::GENERATION_MODE_AUTO,
+        self::GENERATION_MODE_IMPORTED,
+    ];
 
     public const CATEGORY_PORTRAIT = 'portrait';
 
@@ -84,6 +114,7 @@ class Prompt extends Model
      */
     protected $attributes = [
         'copy_count' => 0,
+        'generation_mode' => self::GENERATION_MODE_REFERENCE_IMAGE,
     ];
 
     /**
@@ -120,6 +151,8 @@ class Prompt extends Model
         return [
             'style_notes' => 'array',
             'copy_count' => 'integer',
+            'source_published_at' => 'datetime',
+            'source_modified_at' => 'datetime',
             'generated_at' => 'datetime',
         ];
     }

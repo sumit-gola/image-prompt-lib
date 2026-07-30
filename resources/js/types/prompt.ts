@@ -8,6 +8,8 @@ export type PromptCategory =
 
 export type PromptStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
+export type PromptGenerationMode = 'reference_image' | 'auto' | 'imported';
+
 export type PromptSort =
     | 'newest'
     | 'popular'
@@ -41,6 +43,7 @@ export type PromptStyleNotes = {
     colors: string;
     mood: string;
     quality: string;
+    dynamic_subject_guidance?: string;
 };
 
 export type PromptLibraryItem = {
@@ -49,9 +52,12 @@ export type PromptLibraryItem = {
     prompt: string | null;
     prompt_preview: string;
     negative_prompt: string | null;
-    thumbnail_url: string;
-    reference_image_url: string;
+    thumbnail_prompt: string | null;
+    thumbnail_url: string | null;
+    reference_image_url: string | null;
     detail_url: string;
+    generation_mode: PromptGenerationMode;
+    source_idea: string | null;
     category: PromptCategory | null;
     style_notes: PromptStyleNotes | null;
     copy_count: number;
@@ -97,7 +103,7 @@ export type AdminPromptItem = PromptLibraryItem & {
 export type DashboardPromptItem = {
     id: number;
     title: string;
-    thumbnail_url: string;
+    thumbnail_url: string | null;
     category: PromptCategory | null;
     status: PromptStatus;
     error_message: string | null;

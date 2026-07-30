@@ -42,7 +42,9 @@ class DashboardController extends Controller
         return [
             'id' => $prompt->id,
             'title' => $prompt->title,
-            'thumbnail_url' => Storage::disk('public')->url($prompt->thumbnail_path),
+            'thumbnail_url' => $prompt->thumbnail_path === null
+                ? null
+                : Storage::disk('public')->url($prompt->thumbnail_path),
             'category' => $prompt->category,
             'status' => $prompt->status,
             'error_message' => $prompt->error_message,

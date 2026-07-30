@@ -51,6 +51,10 @@ class GeneratePromptFromReferenceImageJob implements ShouldQueue
             $model = $configuration['model'];
             $timeout = $configuration['timeout'];
 
+            if (! is_string($this->prompt->reference_image_path) || trim($this->prompt->reference_image_path) === '') {
+                throw new RuntimeException('Reference image is missing for this prompt.');
+            }
+
             $response = (new ReferenceImagePromptAgent)->prompt(
                 'Create the prompt library entry for this reference image.',
                 attachments: [

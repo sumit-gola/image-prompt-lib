@@ -4,8 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Actions\Prompts\BuildPromptStatusSummary;
 use App\Actions\Prompts\ResolvePromptLibraryAiConfiguration;
+use App\Actions\Prompts\ResolvePromptLibraryImageConfiguration;
+use App\Actions\Prompts\StoreAutoPrompt;
 use App\Actions\Prompts\StorePromptReferenceImages;
+use App\Http\Requests\StoreAutoPromptRequest;
 use App\Http\Requests\StorePromptReferenceImagesRequest;
+use App\Jobs\GenerateAutoPromptJob;
 use App\Jobs\GeneratePromptFromReferenceImageJob;
 use App\Models\Prompt;
 use App\Models\User;
@@ -23,6 +27,7 @@ class AdminPromptController extends Controller
         Request $request,
         BuildPromptStatusSummary $buildPromptStatusSummary,
         ResolvePromptLibraryAiConfiguration $aiConfiguration,
+        ResolvePromptLibraryImageConfiguration $imageConfiguration,
     ): Response {
         Gate::authorize('create', Prompt::class);
 
@@ -41,6 +46,8 @@ class AdminPromptController extends Controller
                 $query->where(function ($query) use ($search): void {
                     $query->where('title', 'like', "%{$search}%")
                         ->orWhere('prompt', 'like', "%{$search}%")
+                        ->orWhere('source_idea', 'like', "%{$search}%")
+                        ->orWhere('thumbnail_prompt', 'like', "%{$search}%")
                         ->orWhere('error_message', 'like', "%{$search}%");
                 });
             })
@@ -64,6 +71,7 @@ class AdminPromptController extends Controller
             ],
             'summary' => $buildPromptStatusSummary->handle(),
             'aiConfiguration' => $aiConfiguration->handle(),
+            'imageAiConfiguration' => $imageConfiguration->handle(),
             'requiresPolling' => Prompt::query()
                 ->whereIn('status', [Prompt::STATUS_PENDING, Prompt::STATUS_PROCESSING])
                 ->exists(),
@@ -83,14 +91,34 @@ class AdminPromptController extends Controller
             ->with('success', $prompts->count().' reference image'.($prompts->count() === 1 ? '' : 's').' queued for prompt generation.');
     }
 
+    public function storeAuto(StoreAutoPromptRequest $request, StoreAutoPrompt $store): RedirectResponse
+    {
+        $user = $request->user();
+
+        abort_unless($user instanceof User, 403);
+
+        /** @var array{idea: string, category: string, visual_style?: string|null, subject?: string|null, mood?: string|null, lighting?: string|null, camera_notes?: string|null, target_model_notes?: string|null, negative_notes?: string|null} $data */
+        $data = $request->validated();
+
+        $store->handle($user, $data);
+
+        return redirect()
+            ->route('admin.prompts.index')
+            ->with('success', 'Auto prompt generation queued.');
+    }
+
     public function destroy(Prompt $prompt): RedirectResponse
     {
         Gate::authorize('delete', $prompt);
 
-        Storage::disk('public')->delete([
+        $paths = array_values(array_filter([
             $prompt->reference_image_path,
             $prompt->thumbnail_path,
-        ]);
+        ], fn (?string $path): bool => is_string($path) && $path !== ''));
+
+        if ($paths !== []) {
+            Storage::disk('public')->delete($paths);
+        }
 
         $prompt->delete();
 
@@ -105,7 +133,8 @@ class AdminPromptController extends Controller
             'title' => 'Generating prompt',
             'prompt' => null,
             'negative_prompt' => null,
-            'category' => null,
+            'thumbnail_prompt' => null,
+            'category' => $prompt->generation_mode === Prompt::GENERATION_MODE_AUTO ? $prompt->category : null,
             'style_notes' => null,
             'ai_provider' => null,
             'ai_model' => null,
@@ -114,7 +143,17 @@ class AdminPromptController extends Controller
             'generated_at' => null,
         ]);
 
-        GeneratePromptFromReferenceImageJob::dispatch($prompt);
+        if ($prompt->generation_mode === Prompt::GENERATION_MODE_AUTO) {
+            if (is_string($prompt->thumbnail_path) && $prompt->thumbnail_path !== '') {
+                Storage::disk('public')->delete($prompt->thumbnail_path);
+            }
+
+            $prompt->forceFill(['thumbnail_path' => null])->save();
+
+            GenerateAutoPromptJob::dispatch($prompt);
+        } else {
+            GeneratePromptFromReferenceImageJob::dispatch($prompt);
+        }
 
         return back()->with('success', 'Prompt generation queued again.');
     }
@@ -125,6 +164,12 @@ class AdminPromptController extends Controller
     protected function adminPromptData(Prompt $prompt): array
     {
         $promptText = $prompt->prompt ?? '';
+        $thumbnailUrl = $prompt->thumbnail_path === null
+            ? null
+            : Storage::disk('public')->url($prompt->thumbnail_path);
+        $referenceImageUrl = $prompt->reference_image_path === null
+            ? $thumbnailUrl
+            : Storage::disk('public')->url($prompt->reference_image_path);
 
         return [
             'id' => $prompt->id,
@@ -132,9 +177,12 @@ class AdminPromptController extends Controller
             'prompt' => $prompt->prompt,
             'prompt_preview' => Str::of($promptText)->squish()->limit(170)->toString(),
             'negative_prompt' => $prompt->negative_prompt,
-            'thumbnail_url' => Storage::disk('public')->url($prompt->thumbnail_path),
-            'reference_image_url' => Storage::disk('public')->url($prompt->reference_image_path),
+            'thumbnail_prompt' => $prompt->thumbnail_prompt,
+            'thumbnail_url' => $thumbnailUrl,
+            'reference_image_url' => $referenceImageUrl,
             'detail_url' => route('prompts.show', $prompt),
+            'generation_mode' => $prompt->generation_mode,
+            'source_idea' => $prompt->source_idea,
             'category' => $prompt->category,
             'style_notes' => $prompt->style_notes,
             'status' => $prompt->status,
