@@ -2,16 +2,21 @@ import { Form, Head, Link, router, usePoll } from '@inertiajs/react';
 import {
     AlertCircle,
     Check,
+    CheckCircle2,
+    Clock3,
     Copy,
+    Images,
     LoaderCircle,
+    RefreshCw,
     Search,
     Trash2,
     UploadCloud,
     X,
 } from 'lucide-react';
-import type { FormEvent} from 'react';
+import type { FormEvent } from 'react';
 import { useState } from 'react';
 import AdminPromptController from '@/actions/App/Http/Controllers/AdminPromptController';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +30,13 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { useClipboard } from '@/hooks/use-clipboard';
-import type { AdminPromptItem, Paginated, PromptStatus } from '@/types';
+import type {
+    AdminPromptItem,
+    Paginated,
+    PromptAiConfiguration,
+    PromptStatus,
+    PromptStatusSummary,
+} from '@/types';
 
 type Props = {
     prompts: Paginated<AdminPromptItem>;
@@ -34,6 +45,8 @@ type Props = {
         search: string;
         status: PromptStatus | null;
     };
+    summary: PromptStatusSummary;
+    aiConfiguration: PromptAiConfiguration;
     requiresPolling: boolean;
 };
 
@@ -48,6 +61,8 @@ export default function AdminPrompts({
     prompts,
     statuses,
     filters,
+    summary,
+    aiConfiguration,
     requiresPolling,
 }: Props) {
     const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
@@ -94,15 +109,43 @@ export default function AdminPrompts({
         applyFilters('', 'all');
     };
 
+    const summaryItems = [
+        {
+            label: 'Total',
+            value: summary.total,
+            icon: Images,
+        },
+        {
+            label: 'Pending',
+            value: summary.pending,
+            icon: Clock3,
+        },
+        {
+            label: 'Processing',
+            value: summary.processing,
+            icon: LoaderCircle,
+        },
+        {
+            label: 'Completed',
+            value: summary.completed,
+            icon: CheckCircle2,
+        },
+        {
+            label: 'Failed',
+            value: summary.failed,
+            icon: AlertCircle,
+        },
+    ];
+
     return (
         <>
-            <Head title="Admin Prompts" />
+            <Head title="Prompt Admin Dashboard" />
 
             <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
                 <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between">
                     <div className="space-y-1">
                         <h1 className="text-2xl font-semibold tracking-normal">
-                            Admin Prompts
+                            Prompt Admin Dashboard
                         </h1>
                         <p className="text-sm text-muted-foreground">
                             {prompts.total} prompt job
@@ -170,6 +213,41 @@ export default function AdminPrompts({
                             )}
                         </div>
                     </form>
+                </div>
+
+                {!aiConfiguration.is_configured && (
+                    <Alert className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-200">
+                        <AlertCircle />
+                        <AlertTitle>AI provider not configured</AlertTitle>
+                        <AlertDescription>
+                            <span>
+                                {aiConfiguration.message ??
+                                    'Prompt generation cannot run until credentials are configured.'}
+                            </span>
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                    {summaryItems.map((item) => {
+                        const Icon = item.icon;
+
+                        return (
+                            <Card key={item.label} className="gap-3 py-4">
+                                <CardHeader className="flex-row items-center justify-between px-4">
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                                        {item.label}
+                                    </CardTitle>
+                                    <Icon className="size-4 text-muted-foreground" />
+                                </CardHeader>
+                                <CardContent className="px-4">
+                                    <div className="text-2xl font-semibold">
+                                        {item.value}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
                 </div>
 
                 <Card>
@@ -333,21 +411,45 @@ function AdminPromptCard({ prompt }: { prompt: AdminPromptItem }) {
                             )}
                         </div>
 
-                        <Button
-                            asChild
-                            variant="ghost"
-                            size="icon"
-                            title="Delete"
-                        >
-                            <Link
-                                href={AdminPromptController.destroy(prompt.id)}
-                                as="button"
-                                preserveScroll
+                        <div className="flex shrink-0 gap-1">
+                            {prompt.status === 'failed' && (
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    size="icon"
+                                    title="Retry"
+                                >
+                                    <Link
+                                        href={AdminPromptController.regenerate(
+                                            prompt.id,
+                                        )}
+                                        as="button"
+                                        preserveScroll
+                                    >
+                                        <RefreshCw />
+                                        <span className="sr-only">Retry</span>
+                                    </Link>
+                                </Button>
+                            )}
+
+                            <Button
+                                asChild
+                                variant="ghost"
+                                size="icon"
+                                title="Delete"
                             >
-                                <Trash2 />
-                                <span className="sr-only">Delete</span>
-                            </Link>
-                        </Button>
+                                <Link
+                                    href={AdminPromptController.destroy(
+                                        prompt.id,
+                                    )}
+                                    as="button"
+                                    preserveScroll
+                                >
+                                    <Trash2 />
+                                    <span className="sr-only">Delete</span>
+                                </Link>
+                            </Button>
+                        </div>
                     </div>
 
                     {prompt.status === 'failed' && prompt.error_message ? (
@@ -450,7 +552,7 @@ function Pagination({ prompts }: { prompts: Paginated<AdminPromptItem> }) {
 AdminPrompts.layout = {
     breadcrumbs: [
         {
-            title: 'Admin Prompts',
+            title: 'Prompt Admin Dashboard',
             href: AdminPromptController.index(),
         },
     ],

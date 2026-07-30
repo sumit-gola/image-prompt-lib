@@ -71,6 +71,78 @@ test('admins can upload prompt references', function (): void {
     );
 });
 
+test('admins can view prompt dashboard summaries', function (): void {
+    config([
+        'ai.prompt_library.provider' => 'openai',
+        'ai.providers.openai.key' => null,
+    ]);
+
+    $admin = User::factory()->admin()->create();
+
+    Prompt::factory()->create(['status' => Prompt::STATUS_COMPLETED]);
+    Prompt::factory()->pending()->create();
+    Prompt::factory()->failed()->create();
+
+    $this->actingAs($admin)
+        ->get('/admin/prompts')
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('admin/prompts/index')
+            ->where('summary.total', 3)
+            ->where('summary.completed', 1)
+            ->where('summary.pending', 1)
+            ->where('summary.failed', 1)
+            ->where('aiConfiguration.is_configured', false)
+            ->where('aiConfiguration.credential_env', 'OPENAI_API_KEY'));
+});
+
+test('admins can regenerate failed prompt references', function (): void {
+    Bus::fake();
+
+    $admin = User::factory()->admin()->create();
+    $prompt = Prompt::factory()->failed()->create([
+        'title' => 'Failed prompt',
+        'prompt' => 'Old prompt',
+        'error_message' => 'Old error',
+    ]);
+
+    $this->actingAs($admin)
+        ->post("/admin/prompts/{$prompt->id}/regenerate")
+        ->assertRedirect();
+
+    $prompt->refresh();
+
+    expect($prompt)
+        ->title->toBe('Generating prompt')
+        ->prompt->toBeNull()
+        ->status->toBe(Prompt::STATUS_PENDING)
+        ->error_message->toBeNull()
+        ->generated_at->toBeNull();
+
+    Bus::assertDispatched(
+        GeneratePromptFromReferenceImageJob::class,
+        fn (GeneratePromptFromReferenceImageJob $job): bool => $job->prompt->is($prompt),
+    );
+});
+
+test('dashboard returns prompt operations data for admins', function (): void {
+    $admin = User::factory()->admin()->create();
+
+    Prompt::factory()->create(['title' => 'Completed library prompt']);
+    Prompt::factory()->pending()->create();
+
+    $this->actingAs($admin)
+        ->get('/dashboard')
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('dashboard')
+            ->where('canManagePrompts', true)
+            ->where('promptSummary.total', 2)
+            ->where('promptSummary.completed', 1)
+            ->where('promptSummary.pending', 1)
+            ->has('recentPrompts', 2));
+});
+
 test('invalid prompt reference uploads are rejected', function (): void {
     Bus::fake();
     Storage::fake('public');
@@ -92,6 +164,8 @@ test('invalid prompt reference uploads are rejected', function (): void {
 });
 
 test('the prompt generation job stores structured ai output', function (): void {
+    config(['ai.providers.openai.key' => 'test-key']);
+
     Storage::fake('public');
 
     Storage::disk('public')->put('prompts/references/reference.jpg', 'fake-image');
@@ -120,7 +194,7 @@ test('the prompt generation job stores structured ai output', function (): void 
         ],
     ])->preventStrayPrompts();
 
-    (new GeneratePromptFromReferenceImageJob($prompt))->handle();
+    app()->call([(new GeneratePromptFromReferenceImageJob($prompt)), 'handle']);
 
     $prompt->refresh();
 
@@ -141,6 +215,8 @@ test('the prompt generation job stores structured ai output', function (): void 
 });
 
 test('the prompt generation job marks failed ai calls', function (): void {
+    config(['ai.providers.openai.key' => 'test-key']);
+
     Storage::fake('public');
 
     Storage::disk('public')->put('prompts/references/reference.jpg', 'fake-image');
@@ -154,7 +230,7 @@ test('the prompt generation job marks failed ai calls', function (): void {
         throw new RuntimeException('vision model unavailable');
     })->preventStrayPrompts();
 
-    expect(fn () => (new GeneratePromptFromReferenceImageJob($prompt))->handle())
+    expect(fn () => app()->call([(new GeneratePromptFromReferenceImageJob($prompt)), 'handle']))
         ->toThrow(RuntimeException::class, 'vision model unavailable');
 
     $prompt->refresh();
@@ -162,6 +238,35 @@ test('the prompt generation job marks failed ai calls', function (): void {
     expect($prompt)
         ->status->toBe(Prompt::STATUS_FAILED)
         ->error_message->toBe('vision model unavailable');
+});
+
+test('the prompt generation job fails clearly when ai credentials are missing', function (): void {
+    config([
+        'ai.prompt_library.provider' => 'openai',
+        'ai.providers.openai.key' => null,
+    ]);
+
+    Storage::fake('public');
+
+    Storage::disk('public')->put('prompts/references/reference.jpg', 'fake-image');
+
+    $prompt = Prompt::factory()->pending()->create([
+        'reference_image_path' => 'prompts/references/reference.jpg',
+        'thumbnail_path' => 'prompts/thumbnails/reference.jpg',
+    ]);
+
+    ReferenceImagePromptAgent::fake()->preventStrayPrompts();
+
+    expect(fn () => app()->call([(new GeneratePromptFromReferenceImageJob($prompt)), 'handle']))
+        ->toThrow(RuntimeException::class, 'OPENAI_API_KEY');
+
+    $prompt->refresh();
+
+    expect($prompt)
+        ->status->toBe(Prompt::STATUS_FAILED)
+        ->error_message->toContain('OPENAI_API_KEY');
+
+    ReferenceImagePromptAgent::assertNeverPrompted();
 });
 
 test('completed prompt detail exposes copyable prompt text', function (): void {

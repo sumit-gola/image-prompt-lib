@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Prompts\BuildPromptStatusSummary;
+use App\Actions\Prompts\ResolvePromptLibraryAiConfiguration;
 use App\Actions\Prompts\StorePromptReferenceImages;
 use App\Http\Requests\StorePromptReferenceImagesRequest;
+use App\Jobs\GeneratePromptFromReferenceImageJob;
 use App\Models\Prompt;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -15,8 +18,11 @@ use Inertia\Response;
 
 class AdminPromptController extends Controller
 {
-    public function index(Request $request): Response
-    {
+    public function index(
+        Request $request,
+        BuildPromptStatusSummary $buildPromptStatusSummary,
+        ResolvePromptLibraryAiConfiguration $aiConfiguration,
+    ): Response {
         Gate::authorize('create', Prompt::class);
 
         $search = trim((string) $request->string('search'));
@@ -55,6 +61,8 @@ class AdminPromptController extends Controller
                 'search' => $search,
                 'status' => $status,
             ],
+            'summary' => $buildPromptStatusSummary->handle(),
+            'aiConfiguration' => $aiConfiguration->handle(),
             'requiresPolling' => Prompt::query()
                 ->whereIn('status', [Prompt::STATUS_PENDING, Prompt::STATUS_PROCESSING])
                 ->exists(),
@@ -86,6 +94,28 @@ class AdminPromptController extends Controller
         $prompt->delete();
 
         return back()->with('success', 'Prompt deleted.');
+    }
+
+    public function regenerate(Prompt $prompt): RedirectResponse
+    {
+        Gate::authorize('regenerate', $prompt);
+
+        $prompt->update([
+            'title' => 'Generating prompt',
+            'prompt' => null,
+            'negative_prompt' => null,
+            'category' => null,
+            'style_notes' => null,
+            'ai_provider' => null,
+            'ai_model' => null,
+            'status' => Prompt::STATUS_PENDING,
+            'error_message' => null,
+            'generated_at' => null,
+        ]);
+
+        GeneratePromptFromReferenceImageJob::dispatch($prompt);
+
+        return back()->with('success', 'Prompt generation queued again.');
     }
 
     /**

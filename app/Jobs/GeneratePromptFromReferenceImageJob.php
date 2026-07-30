@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Prompts\ResolvePromptLibraryAiConfiguration;
 use App\Ai\Agents\ReferenceImagePromptAgent;
 use App\Models\Prompt;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -32,7 +33,7 @@ class GeneratePromptFromReferenceImageJob implements ShouldQueue
      *
      * @throws Throwable
      */
-    public function handle(): void
+    public function handle(ResolvePromptLibraryAiConfiguration $aiConfiguration): void
     {
         $this->prompt->update([
             'status' => Prompt::STATUS_PROCESSING,
@@ -40,12 +41,15 @@ class GeneratePromptFromReferenceImageJob implements ShouldQueue
         ]);
 
         try {
-            $provider = config('ai.prompt_library.provider');
-            $model = config('ai.prompt_library.model');
-            $timeout = (int) config('ai.prompt_library.timeout', 120);
+            $configuration = $aiConfiguration->handle();
 
-            $provider = is_string($provider) && $provider !== '' ? $provider : null;
-            $model = is_string($model) && $model !== '' ? $model : null;
+            if (! $configuration['is_configured']) {
+                throw new RuntimeException($configuration['message'] ?? 'AI provider is not configured.');
+            }
+
+            $provider = $configuration['provider'];
+            $model = $configuration['model'];
+            $timeout = $configuration['timeout'];
 
             $response = (new ReferenceImagePromptAgent)->prompt(
                 'Create the prompt library entry for this reference image.',
@@ -69,7 +73,7 @@ class GeneratePromptFromReferenceImageJob implements ShouldQueue
                 'negative_prompt' => $this->nullableStringValue($data['negative_prompt'] ?? null),
                 'category' => Prompt::normalizeCategory($data['category'] ?? null),
                 'style_notes' => is_array($data['style_notes'] ?? null) ? $data['style_notes'] : null,
-                'ai_provider' => $provider ?? config('ai.default'),
+                'ai_provider' => $provider,
                 'ai_model' => $model,
                 'status' => Prompt::STATUS_COMPLETED,
                 'error_message' => null,

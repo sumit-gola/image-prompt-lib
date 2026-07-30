@@ -48,7 +48,7 @@ export function AppSidebar() {
         ...(auth.user?.is_admin
             ? [
                   {
-                      title: 'Admin Prompts',
+                      title: 'Admin Dashboard',
                       href: AdminPromptController.index(),
                       icon: Shield,
                   },

@@ -48,6 +48,14 @@ class PromptPolicy
     }
 
     /**
+     * Determine whether the user can regenerate the prompt.
+     */
+    public function regenerate(User $user, Prompt $prompt): bool
+    {
+        return $user->is_admin;
+    }
+
+    /**
      * Determine whether the user can restore the model.
      */
     public function restore(User $user, Prompt $prompt): bool

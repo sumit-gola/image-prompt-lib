@@ -8,6 +8,23 @@ export type PromptCategory =
 
 export type PromptStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
+export type PromptStatusSummary = {
+    total: number;
+    pending: number;
+    processing: number;
+    completed: number;
+    failed: number;
+};
+
+export type PromptAiConfiguration = {
+    provider: string | null;
+    model: string | null;
+    timeout: number;
+    is_configured: boolean;
+    message: string | null;
+    credential_env: string | null;
+};
+
 export type PromptStyleNotes = {
     subject: string;
     composition: string;
@@ -42,6 +59,17 @@ export type AdminPromptItem = PromptLibraryItem & {
         name: string;
         email: string;
     } | null;
+};
+
+export type DashboardPromptItem = {
+    id: number;
+    title: string;
+    thumbnail_url: string;
+    category: PromptCategory | null;
+    status: PromptStatus;
+    error_message: string | null;
+    generated_at: string | null;
+    created_at: string | null;
 };
 
 export type Paginated<T> = {
