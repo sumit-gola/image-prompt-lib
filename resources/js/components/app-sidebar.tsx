@@ -1,7 +1,15 @@
 import { Link } from '@inertiajs/react';
 import { usePage } from '@inertiajs/react';
-import { BookOpen, FolderGit2, Images, LayoutGrid, Shield } from 'lucide-react';
+import {
+    BookOpen,
+    FolderGit2,
+    ImagePlus,
+    Images,
+    LayoutGrid,
+    Shield,
+} from 'lucide-react';
 import AdminPromptController from '@/actions/App/Http/Controllers/AdminPromptController';
+import ImageToPromptController from '@/actions/App/Http/Controllers/ImageToPromptController';
 import PromptController from '@/actions/App/Http/Controllers/PromptController';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -44,6 +52,11 @@ export function AppSidebar() {
             title: 'Prompt Library',
             href: PromptController.index(),
             icon: Images,
+        },
+        {
+            title: 'Image to Prompt',
+            href: ImageToPromptController.index(),
+            icon: ImagePlus,
         },
         ...(auth.user?.is_admin
             ? [

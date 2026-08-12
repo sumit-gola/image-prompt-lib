@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminPromptController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ImageToPromptController;
 use App\Http\Controllers\PromptController;
 use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\SeoController;
@@ -25,6 +26,10 @@ Route::post('prompts/{prompt}/copy', [PromptController::class, 'copy'])
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('image-to-prompt', [ImageToPromptController::class, 'index'])->name('image-to-prompt.index');
+    Route::post('image-to-prompt', [ImageToPromptController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('image-to-prompt.store');
 
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('prompts', [AdminPromptController::class, 'index'])->name('prompts.index');

@@ -82,6 +82,7 @@ class ResolvePromptLibraryAiConfiguration
             'azure' => 'AZURE_OPENAI_API_KEY',
             'bedrock' => 'AWS_BEARER_TOKEN_BEDROCK',
             'eleven' => 'ELEVENLABS_API_KEY',
+            'nvidia' => 'NVIDIA_API_KEY',
             'openai-compatible' => 'OPENAI_COMPATIBLE_API_KEY',
             default => strtoupper(str_replace('-', '_', $provider)).'_API_KEY',
         };

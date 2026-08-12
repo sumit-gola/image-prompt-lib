@@ -128,6 +128,17 @@ return [
             'key' => env('MISTRAL_API_KEY'),
         ],
 
+        'nvidia' => [
+            'driver' => 'openai-compatible',
+            'url' => env('NVIDIA_BASE_URL', 'https://integrate.api.nvidia.com/v1'),
+            'key' => env('NVIDIA_API_KEY'),
+            'models' => [
+                'text' => [
+                    'default' => env('NVIDIA_MODEL', 'thinkingmachines/inkling'),
+                ],
+            ],
+        ],
+
         'ollama' => [
             'driver' => 'ollama',
             'key' => env('OLLAMA_API_KEY', ''),
