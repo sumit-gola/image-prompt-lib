@@ -2,14 +2,12 @@
 
 namespace App\Jobs;
 
+use App\Actions\Prompts\GenerateAndStorePromptThumbnail;
 use App\Actions\Prompts\ResolvePromptLibraryAiConfiguration;
-use App\Actions\Prompts\ResolvePromptLibraryImageConfiguration;
 use App\Ai\Agents\AutoPromptGeneratorAgent;
 use App\Models\Prompt;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Str;
-use Laravel\Ai\Image;
 use Laravel\Ai\Responses\StructuredAgentResponse;
 use RuntimeException;
 use Throwable;
@@ -37,7 +35,7 @@ class GenerateAutoPromptJob implements ShouldQueue
      */
     public function handle(
         ResolvePromptLibraryAiConfiguration $aiConfiguration,
-        ResolvePromptLibraryImageConfiguration $imageConfiguration,
+        GenerateAndStorePromptThumbnail $generateThumbnail,
     ): void {
         $this->prompt->update([
             'status' => Prompt::STATUS_PROCESSING,
@@ -51,18 +49,8 @@ class GenerateAutoPromptJob implements ShouldQueue
                 throw new RuntimeException($textConfiguration['message'] ?? 'AI provider is not configured.');
             }
 
-            $imageProviderConfiguration = $imageConfiguration->handle();
-
-            if (! $imageProviderConfiguration['is_configured']) {
-                throw new RuntimeException($imageProviderConfiguration['message'] ?? 'AI image provider is not configured.');
-            }
-
             if (! is_string($textConfiguration['provider'])) {
                 throw new RuntimeException('AI provider is not configured.');
-            }
-
-            if (! is_string($imageProviderConfiguration['provider'])) {
-                throw new RuntimeException('AI image provider is not configured.');
             }
 
             $response = (new AutoPromptGeneratorAgent)->prompt(
@@ -91,15 +79,9 @@ class GenerateAutoPromptJob implements ShouldQueue
                 'ai_model' => $textConfiguration['model'],
             ]);
 
-            $thumbnailPath = $this->generateThumbnail(
-                $thumbnailPrompt,
-                $imageProviderConfiguration['provider'],
-                $imageProviderConfiguration['model'],
-                $imageProviderConfiguration['timeout'],
-            );
+            $generateThumbnail->handle($this->prompt->refresh());
 
             $this->prompt->update([
-                'thumbnail_path' => $thumbnailPath,
                 'status' => Prompt::STATUS_COMPLETED,
                 'error_message' => null,
                 'generated_at' => now(),
@@ -137,34 +119,6 @@ Create an auto generated prompt library entry from this creative brief.
 
 Return a complete prompt, negative prompt, category, style notes, and thumbnail prompt.
 PROMPT;
-    }
-
-    protected function generateThumbnail(string $thumbnailPrompt, string $provider, ?string $model, int $timeout): string
-    {
-        $response = Image::of($thumbnailPrompt)
-            ->quality('high')
-            ->portrait()
-            ->timeout($timeout)
-            ->generate($provider, $model);
-
-        $storedPath = $response->storePubliclyAs('prompts/thumbnails', $this->thumbnailFilename($response->firstImage()->mime()), 'public');
-
-        if (! is_string($storedPath)) {
-            throw new RuntimeException('Unable to store the generated thumbnail image.');
-        }
-
-        return $storedPath;
-    }
-
-    protected function thumbnailFilename(string $mime): string
-    {
-        $extension = match ($mime) {
-            'image/jpeg' => 'jpg',
-            'image/webp' => 'webp',
-            default => 'png',
-        };
-
-        return Str::uuid().".{$extension}";
     }
 
     protected function stringValue(mixed $value, string $fallback = ''): string

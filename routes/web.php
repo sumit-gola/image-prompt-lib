@@ -39,6 +39,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('prompts/{prompt}/edit', [AdminPromptController::class, 'edit'])->name('prompts.edit');
         Route::patch('prompts/{prompt}', [AdminPromptController::class, 'update'])->name('prompts.update');
         Route::post('prompts/{prompt}/regenerate', [AdminPromptController::class, 'regenerate'])->name('prompts.regenerate');
+        Route::post('prompts/{prompt}/thumbnail', [AdminPromptController::class, 'generateThumbnail'])
+            ->middleware('throttle:10,1')
+            ->name('prompts.thumbnail');
         Route::delete('prompts/{prompt}', [AdminPromptController::class, 'destroy'])->name('prompts.destroy');
     });
 });

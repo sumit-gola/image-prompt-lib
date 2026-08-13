@@ -13,6 +13,7 @@ use App\Http\Requests\StorePromptReferenceImagesRequest;
 use App\Http\Requests\UpdatePromptRequest;
 use App\Jobs\GenerateAutoPromptJob;
 use App\Jobs\GeneratePromptFromReferenceImageJob;
+use App\Jobs\GeneratePromptThumbnailJob;
 use App\Models\Prompt;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -102,7 +103,7 @@ class AdminPromptController extends Controller
         ]);
     }
 
-    public function edit(Prompt $prompt): Response
+    public function edit(Prompt $prompt, ResolvePromptLibraryImageConfiguration $imageConfiguration): Response
     {
         Gate::authorize('update', $prompt);
 
@@ -112,6 +113,7 @@ class AdminPromptController extends Controller
             'promptItem' => $this->adminPromptData($prompt),
             'statuses' => Prompt::STATUSES,
             'categories' => Prompt::CATEGORIES,
+            'imageAiConfiguration' => $imageConfiguration->handle(),
         ]);
     }
 
@@ -231,6 +233,23 @@ class AdminPromptController extends Controller
         $this->resetAndDispatchRegeneration($prompt);
 
         return back()->with('success', 'Prompt generation queued again.');
+    }
+
+    public function generateThumbnail(Prompt $prompt): RedirectResponse
+    {
+        Gate::authorize('update', $prompt);
+
+        abort_if($prompt->status === Prompt::STATUS_PROCESSING, 422, 'This prompt is already processing.');
+        abort_unless(filled($prompt->thumbnail_prompt) || filled($prompt->prompt), 422, 'Add a thumbnail prompt or main prompt first.');
+
+        $prompt->forceFill([
+            'status' => Prompt::STATUS_PROCESSING,
+            'error_message' => null,
+        ])->save();
+
+        GeneratePromptThumbnailJob::dispatch($prompt);
+
+        return back()->with('success', 'Thumbnail generation queued.');
     }
 
     /**

@@ -132,6 +132,16 @@ return [
             'driver' => 'openai-compatible',
             'url' => env('NVIDIA_BASE_URL', 'https://integrate.api.nvidia.com/v1'),
             'key' => env('NVIDIA_API_KEY'),
+            'image' => [
+                'key' => env('NVIDIA_IMAGE_API_KEY', env('NVIDIA_API_KEY')),
+                'url' => env('NVIDIA_IMAGE_URL', 'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev'),
+                'model' => env('NVIDIA_IMAGE_MODEL', 'black-forest-labs/flux.1-dev'),
+                'width' => (int) env('NVIDIA_IMAGE_WIDTH', 832),
+                'height' => (int) env('NVIDIA_IMAGE_HEIGHT', 1216),
+                'steps' => (int) env('NVIDIA_IMAGE_STEPS', 50),
+                'cfg_scale' => (float) env('NVIDIA_IMAGE_CFG_SCALE', 5),
+                'prompt_limit' => (int) env('NVIDIA_IMAGE_PROMPT_LIMIT', 10000),
+            ],
             'models' => [
                 'text' => [
                     'default' => env('NVIDIA_MODEL', 'thinkingmachines/inkling'),

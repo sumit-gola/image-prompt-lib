@@ -26,6 +26,7 @@ Rules:
 - Do not mention that the prompt came from an uploaded image.
 - Do not include private identity claims or real-person identity guesses.
 - Keep the prompt usable as-is in common image generation tools.
+- Write a separate thumbnail prompt that recreates the reference's visual direction as a strong portrait-format preview without text, logos, watermarks, or UI.
 - Prefer concrete visual details over vague words.
 - If the image contains a person, describe the person generically as the subject rather than naming or identifying them.
 - Return only the structured schema.
@@ -42,6 +43,7 @@ PROMPT;
             'prompt' => $schema->string()->required(),
             'negative_prompt' => $schema->string()->nullable(),
             'category' => $schema->string()->enum(['portrait', 'product', 'fashion', 'lifestyle', 'art', 'other'])->required(),
+            'thumbnail_prompt' => $schema->string()->required(),
             'style_notes' => $schema->object(fn (JsonSchema $schema): array => [
                 'subject' => $schema->string()->required(),
                 'composition' => $schema->string()->required(),

@@ -1,4 +1,4 @@
-import { Form, Head, Link, router } from '@inertiajs/react';
+import { Form, Head, Link, router, usePoll } from '@inertiajs/react';
 import {
     ArrowLeft,
     Bot,
@@ -49,6 +49,12 @@ type Props = {
     promptItem: AdminPromptItem;
     statuses: PromptStatus[];
     categories: PromptCategory[];
+    imageAiConfiguration: {
+        provider: string | null;
+        model: string | null;
+        is_configured: boolean;
+        message: string | null;
+    };
 };
 
 const statusLabels: Record<PromptStatus, string> = {
@@ -81,7 +87,13 @@ export default function EditPrompt({
     promptItem,
     statuses,
     categories,
+    imageAiConfiguration,
 }: Props) {
+    usePoll(
+        2000,
+        { only: ['promptItem'] },
+        { autoStart: promptItem.status === 'processing' },
+    );
     const [status, setStatus] = useState<PromptStatus>(promptItem.status);
     const [category, setCategory] = useState<PromptCategory | 'none'>(
         promptItem.category ?? 'none',
@@ -89,7 +101,7 @@ export default function EditPrompt({
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [copiedValue, copy] = useClipboard();
     const displayImageUrl =
-        promptItem.reference_image_url ?? promptItem.thumbnail_url;
+        promptItem.thumbnail_url ?? promptItem.reference_image_url;
     const promptText = promptItem.prompt ?? '';
 
     const deletePrompt = () => {
@@ -103,7 +115,7 @@ export default function EditPrompt({
             <Head title={`Edit ${promptItem.title}`} />
 
             <div className="flex h-full flex-1 flex-col gap-6 overflow-x-hidden p-4 sm:p-6">
-                <header className="rounded-xl border bg-[linear-gradient(135deg,rgb(255_255_255_/_0.92),rgb(245_243_255_/_0.78),rgb(236_254_255_/_0.56))] p-4 shadow-sm backdrop-blur dark:bg-[linear-gradient(135deg,rgb(17_24_39_/_0.88),rgb(49_46_129_/_0.28),rgb(8_47_73_/_0.24))] sm:p-5">
+                <header className="rounded-xl border bg-[linear-gradient(135deg,rgb(255_255_255_/_0.92),rgb(245_243_255_/_0.78),rgb(236_254_255_/_0.56))] p-4 shadow-sm backdrop-blur sm:p-5 dark:bg-[linear-gradient(135deg,rgb(17_24_39_/_0.88),rgb(49_46_129_/_0.28),rgb(8_47_73_/_0.24))]">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div className="min-w-0 space-y-3">
                             <Button asChild variant="outline" size="sm">
@@ -140,7 +152,10 @@ export default function EditPrompt({
                         </div>
 
                         <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4 lg:min-w-[28rem]">
-                            <Metric label="Copies" value={promptItem.copy_count} />
+                            <Metric
+                                label="Copies"
+                                value={promptItem.copy_count}
+                            />
                             <Metric
                                 label="Created"
                                 value={formatDate(promptItem.created_at)}
@@ -161,6 +176,50 @@ export default function EditPrompt({
                     <aside className="space-y-4">
                         <Card className="overflow-hidden rounded-xl py-0">
                             <div className="relative">
+                                <div className="absolute top-3 right-3 z-10">
+                                    {!imageAiConfiguration.is_configured ||
+                                    promptItem.status === 'processing' ||
+                                    !promptItem.prompt ? (
+                                        <Button
+                                            type="button"
+                                            className="border-white/20 bg-black/70 text-white shadow-lg backdrop-blur hover:bg-black/80"
+                                            disabled
+                                            title={
+                                                imageAiConfiguration.message ??
+                                                'A saved prompt is required.'
+                                            }
+                                        >
+                                            {promptItem.status ===
+                                            'processing' ? (
+                                                <LoaderCircle className="animate-spin" />
+                                            ) : (
+                                                <Sparkles />
+                                            )}
+                                            {promptItem.status === 'processing'
+                                                ? 'Generating…'
+                                                : 'Generate image'}
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            asChild
+                                            className="border-white/20 bg-black/70 text-white shadow-lg backdrop-blur hover:bg-black/80"
+                                        >
+                                            <Link
+                                                href={AdminPromptController.generateThumbnail(
+                                                    promptItem.id,
+                                                )}
+                                                method="post"
+                                                preserveScroll
+                                                title="Generate a new thumbnail from the saved prompt"
+                                            >
+                                                <Sparkles />
+                                                {promptItem.thumbnail_url
+                                                    ? 'Regenerate image'
+                                                    : 'Generate image'}
+                                            </Link>
+                                        </Button>
+                                    )}
+                                </div>
                                 {displayImageUrl ? (
                                     <img
                                         src={displayImageUrl}
@@ -277,10 +336,10 @@ export default function EditPrompt({
                                     <CardHeader className="gap-2">
                                         <CardTitle>Prompt details</CardTitle>
                                         <p className="text-sm text-muted-foreground">
-                                            Completed prompts must include usable
-                                            prompt text. Drafts can remain
-                                            pending or failed while you repair
-                                            them.
+                                            Completed prompts must include
+                                            usable prompt text. Drafts can
+                                            remain pending or failed while you
+                                            repair them.
                                         </p>
                                     </CardHeader>
                                     <CardContent className="grid gap-5">
@@ -410,7 +469,9 @@ export default function EditPrompt({
                                             label="Prompt"
                                             name="prompt"
                                             rows={12}
-                                            defaultValue={promptItem.prompt ?? ''}
+                                            defaultValue={
+                                                promptItem.prompt ?? ''
+                                            }
                                         />
                                         <TextArea
                                             error={fieldError(
@@ -435,7 +496,8 @@ export default function EditPrompt({
                                             name="thumbnail_prompt"
                                             rows={5}
                                             defaultValue={
-                                                promptItem.thumbnail_prompt ?? ''
+                                                promptItem.thumbnail_prompt ??
+                                                ''
                                             }
                                         />
                                     </CardContent>
@@ -446,8 +508,8 @@ export default function EditPrompt({
                                         <CardTitle>Image assets</CardTitle>
                                         <p className="text-sm text-muted-foreground">
                                             Replace the visible thumbnail or the
-                                            stored reference image. New filenames
-                                            are generated server-side.
+                                            stored reference image. New
+                                            filenames are generated server-side.
                                         </p>
                                     </CardHeader>
                                     <CardContent className="grid gap-4 md:grid-cols-2">
@@ -486,9 +548,9 @@ export default function EditPrompt({
                                     <CardHeader>
                                         <CardTitle>Style notes</CardTitle>
                                         <p className="text-sm text-muted-foreground">
-                                            Keep these notes short and scannable.
-                                            They support public detail pages and
-                                            admin review.
+                                            Keep these notes short and
+                                            scannable. They support public
+                                            detail pages and admin review.
                                         </p>
                                     </CardHeader>
                                     <CardContent className="grid gap-4 md:grid-cols-2">
@@ -659,7 +721,7 @@ function TextArea({
             <Label htmlFor={id}>{label}</Label>
             <textarea
                 id={id}
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
                 {...props}
             />
             <FieldError message={error} />
@@ -710,7 +772,9 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     return (
         <div className="flex items-start justify-between gap-3 border-b pb-2 last:border-b-0 last:pb-0">
             <span className="text-muted-foreground">{label}</span>
-            <span className="max-w-[14rem] text-right break-words">{value}</span>
+            <span className="max-w-[14rem] text-right break-words">
+                {value}
+            </span>
         </div>
     );
 }
@@ -733,7 +797,8 @@ function StatusBadge({ status }: { status: PromptStatus }) {
 }
 
 function ModeBadge({ mode }: { mode: AdminPromptItem['generation_mode'] }) {
-    const Icon = mode === 'auto' ? Bot : mode === 'imported' ? Sparkles : ImageIcon;
+    const Icon =
+        mode === 'auto' ? Bot : mode === 'imported' ? Sparkles : ImageIcon;
 
     return (
         <Badge variant="outline">

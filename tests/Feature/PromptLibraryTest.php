@@ -411,10 +411,10 @@ test('admins can upload prompt references', function (): void {
     expect($prompt)
         ->user_id->toBe($admin->id)
         ->status->toBe(Prompt::STATUS_PENDING)
-        ->title->toBe('Generating prompt');
+        ->title->toBe('Generating prompt')
+        ->thumbnail_path->toBeNull();
 
     Storage::disk('public')->assertExists($prompt->reference_image_path);
-    Storage::disk('public')->assertExists($prompt->thumbnail_path);
 
     Bus::assertDispatched(
         GeneratePromptFromReferenceImageJob::class,
@@ -542,6 +542,8 @@ test('admins can open the prompt edit page', function (): void {
     $prompt = Prompt::factory()->create([
         'title' => 'Editable prompt',
         'copy_count' => 12,
+        'thumbnail_path' => 'prompts/thumbnails/generated.jpg',
+        'reference_image_path' => 'prompts/references/source.jpg',
     ]);
 
     $this->actingAs($admin)
@@ -552,6 +554,8 @@ test('admins can open the prompt edit page', function (): void {
             ->where('promptItem.id', $prompt->id)
             ->where('promptItem.title', 'Editable prompt')
             ->where('promptItem.copy_count', 12)
+            ->where('promptItem.thumbnail_url', Storage::disk('public')->url('prompts/thumbnails/generated.jpg'))
+            ->where('promptItem.reference_image_url', Storage::disk('public')->url('prompts/references/source.jpg'))
             ->where('promptItem.edit_url', route('admin.prompts.edit', $prompt))
             ->where('statuses.0', Prompt::STATUS_PENDING)
             ->where('categories.0', Prompt::CATEGORY_PORTRAIT));
@@ -1192,7 +1196,11 @@ test('invalid prompt reference uploads are rejected', function (): void {
 });
 
 test('the prompt generation job stores structured ai output', function (): void {
-    config(['ai.providers.openai.key' => 'test-key']);
+    config([
+        'ai.providers.openai.key' => 'test-key',
+        'ai.prompt_library.image_provider' => 'gemini',
+        'ai.providers.gemini.key' => 'test-key',
+    ]);
 
     Storage::fake('public');
 
@@ -1209,6 +1217,7 @@ test('the prompt generation job stores structured ai output', function (): void 
             'prompt' => 'Create a cinematic product table scene with low side light and deep shadows.',
             'negative_prompt' => 'blurry, flat lighting, clutter',
             'category' => Prompt::CATEGORY_PRODUCT,
+            'thumbnail_prompt' => 'Cinematic product table preview with no text or logos.',
             'style_notes' => [
                 'subject' => 'A featured product on a tabletop.',
                 'composition' => 'Centered product with negative space.',
@@ -1222,6 +1231,10 @@ test('the prompt generation job stores structured ai output', function (): void 
         ],
     ])->preventStrayPrompts();
 
+    Image::fake([
+        base64_encode('fake-generated-thumbnail'),
+    ])->preventStrayImages();
+
     app()->call([(new GeneratePromptFromReferenceImageJob($prompt)), 'handle']);
 
     $prompt->refresh();
@@ -1231,6 +1244,7 @@ test('the prompt generation job stores structured ai output', function (): void 
         ->title->toBe('Cinematic product table')
         ->prompt->toContain('cinematic product table')
         ->negative_prompt->toBe('blurry, flat lighting, clutter')
+        ->thumbnail_prompt->toBe('Cinematic product table preview with no text or logos.')
         ->category->toBe(Prompt::CATEGORY_PRODUCT)
         ->generated_at->not->toBeNull();
 
@@ -1239,6 +1253,10 @@ test('the prompt generation job stores structured ai output', function (): void 
 
     ReferenceImagePromptAgent::assertPrompted(
         fn ($prompt): bool => $prompt->contains('Create the prompt library entry'),
+    );
+
+    Image::assertGenerated(
+        fn ($prompt): bool => $prompt->contains('Cinematic product table preview'),
     );
 });
 

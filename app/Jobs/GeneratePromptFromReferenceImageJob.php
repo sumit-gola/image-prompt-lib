@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Prompts\GenerateAndStorePromptThumbnail;
 use App\Actions\Prompts\ResolvePromptLibraryAiConfiguration;
 use App\Ai\Agents\ReferenceImagePromptAgent;
 use App\Models\Prompt;
@@ -33,8 +34,10 @@ class GeneratePromptFromReferenceImageJob implements ShouldQueue
      *
      * @throws Throwable
      */
-    public function handle(ResolvePromptLibraryAiConfiguration $aiConfiguration): void
-    {
+    public function handle(
+        ResolvePromptLibraryAiConfiguration $aiConfiguration,
+        GenerateAndStorePromptThumbnail $generateThumbnail,
+    ): void {
         $this->prompt->update([
             'status' => Prompt::STATUS_PROCESSING,
             'error_message' => null,
@@ -76,9 +79,15 @@ class GeneratePromptFromReferenceImageJob implements ShouldQueue
                 'prompt' => $this->stringValue($data['prompt'] ?? null),
                 'negative_prompt' => $this->nullableStringValue($data['negative_prompt'] ?? null),
                 'category' => Prompt::normalizeCategory($data['category'] ?? null),
+                'thumbnail_prompt' => $this->stringValue($data['thumbnail_prompt'] ?? null, $this->stringValue($data['prompt'] ?? null)),
                 'style_notes' => is_array($data['style_notes'] ?? null) ? $data['style_notes'] : null,
                 'ai_provider' => $provider,
                 'ai_model' => $model,
+            ]);
+
+            $generateThumbnail->handle($this->prompt->refresh());
+
+            $this->prompt->update([
                 'status' => Prompt::STATUS_COMPLETED,
                 'error_message' => null,
                 'generated_at' => now(),
