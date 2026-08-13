@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'prompt_live' => [
+        'url' => env('PROMPT_LIVE_URL', 'http://127.0.0.1:8081'),
+        'token' => env('PROMPT_API_TOKEN'),
+        'user_id' => env('PROMPT_API_USER_ID'),
+        'timeout' => (int) env('PROMPT_LIVE_TIMEOUT', 30),
+    ],
+
 ];

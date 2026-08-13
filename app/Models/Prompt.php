@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\PromptFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,6 +13,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
+ * @property string $prompt_id
  * @property int $user_id
  * @property string $title
  * @property string|null $prompt
@@ -34,6 +36,7 @@ use Illuminate\Support\Carbon;
  * @property string $status
  * @property int $copy_count
  * @property string|null $error_message
+ * @property Carbon|null $reviewed_at
  * @property Carbon|null $generated_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -65,6 +68,8 @@ use Illuminate\Support\Carbon;
 ])]
 class Prompt extends Model
 {
+    use HasUuids;
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_PROCESSING = 'processing';
@@ -115,6 +120,14 @@ class Prompt extends Model
 
     /** @use HasFactory<PromptFactory> */
     use HasFactory;
+
+    /**
+     * @return array<int, string>
+     */
+    public function uniqueIds(): array
+    {
+        return ['prompt_id'];
+    }
 
     /**
      * @var array<string, mixed>
@@ -229,6 +242,7 @@ class Prompt extends Model
             'copy_count' => 'integer',
             'source_published_at' => 'datetime',
             'source_modified_at' => 'datetime',
+            'reviewed_at' => 'datetime',
             'generated_at' => 'datetime',
         ];
     }

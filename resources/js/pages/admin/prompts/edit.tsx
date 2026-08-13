@@ -7,6 +7,7 @@ import {
     ExternalLink,
     ImageIcon,
     LoaderCircle,
+    Rocket,
     RefreshCw,
     Save,
     Sparkles,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import { useEffect, useRef, useState } from 'react';
+import PushPromptToLiveController from '@/actions/App/Http/Controllers/Admin/PushPromptToLiveController';
 import AdminPromptController from '@/actions/App/Http/Controllers/AdminPromptController';
 import PromptThumbnailController from '@/actions/App/Http/Controllers/Api/PromptThumbnailController';
 import { PromptImagePlaceholder } from '@/components/prompts/prompt-image-placeholder';
@@ -101,6 +103,7 @@ export default function EditPrompt({
         promptItem.category ?? 'none',
     );
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [pushLiveOpen, setPushLiveOpen] = useState(false);
     const [thumbnailOpen, setThumbnailOpen] = useState(false);
     const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<
         string | null
@@ -662,6 +665,16 @@ export default function EditPrompt({
                                         show completed prompts.
                                     </div>
                                     <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() =>
+                                                setPushLiveOpen(true)
+                                            }
+                                        >
+                                            <Rocket />
+                                            Push to live
+                                        </Button>
                                         {promptItem.can_regenerate && (
                                             <Button asChild variant="outline">
                                                 <Link
@@ -729,6 +742,51 @@ export default function EditPrompt({
                             Delete prompt
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={pushLiveOpen} onOpenChange={setPushLiveOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Push prompt to live?</DialogTitle>
+                        <DialogDescription>
+                            This sends the saved prompt fields and current
+                            thumbnail to the configured live prompt API. Save
+                            any edits first if you want them included.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Form
+                        {...PushPromptToLiveController.form(promptItem.id)}
+                        onSuccess={() => setPushLiveOpen(false)}
+                    >
+                        {({ errors, processing }) => (
+                            <div className="grid gap-4">
+                                <FieldError
+                                    message={fieldError(errors, 'push_live')}
+                                />
+                                <DialogFooter>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        disabled={processing}
+                                        onClick={() => setPushLiveOpen(false)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={processing}>
+                                        {processing ? (
+                                            <LoaderCircle className="animate-spin" />
+                                        ) : (
+                                            <Rocket />
+                                        )}
+                                        {processing
+                                            ? 'Pushing…'
+                                            : 'Push to live'}
+                                    </Button>
+                                </DialogFooter>
+                            </div>
+                        )}
+                    </Form>
                 </DialogContent>
             </Dialog>
 
