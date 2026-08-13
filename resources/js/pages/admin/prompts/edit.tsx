@@ -1,4 +1,4 @@
-import { Form, Head, Link, router, usePoll } from '@inertiajs/react';
+import { Form, Head, Link, router, useHttp, usePoll } from '@inertiajs/react';
 import {
     ArrowLeft,
     Bot,
@@ -11,10 +11,12 @@ import {
     Save,
     Sparkles,
     Trash2,
+    Upload,
 } from 'lucide-react';
 import type { ComponentProps } from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AdminPromptController from '@/actions/App/Http/Controllers/AdminPromptController';
+import PromptThumbnailController from '@/actions/App/Http/Controllers/Api/PromptThumbnailController';
 import { PromptImagePlaceholder } from '@/components/prompts/prompt-image-placeholder';
 import { categoryLabels } from '@/components/prompts/prompt-library-config';
 import { Badge } from '@/components/ui/badge';
@@ -99,10 +101,68 @@ export default function EditPrompt({
         promptItem.category ?? 'none',
     );
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [thumbnailOpen, setThumbnailOpen] = useState(false);
+    const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<
+        string | null
+    >(null);
+    const thumbnailInputRef = useRef<HTMLInputElement>(null);
+    const thumbnailUpload = useHttp<{ thumbnail: File | null }>({
+        thumbnail: null,
+    });
     const [copiedValue, copy] = useClipboard();
     const displayImageUrl =
         promptItem.thumbnail_url ?? promptItem.reference_image_url;
     const promptText = promptItem.prompt ?? '';
+
+    useEffect(() => {
+        return () => {
+            if (thumbnailPreviewUrl) {
+                URL.revokeObjectURL(thumbnailPreviewUrl);
+            }
+        };
+    }, [thumbnailPreviewUrl]);
+
+    const selectThumbnail = (file: File | null) => {
+        if (thumbnailPreviewUrl) {
+            URL.revokeObjectURL(thumbnailPreviewUrl);
+        }
+
+        thumbnailUpload.clearErrors('thumbnail');
+        thumbnailUpload.setData('thumbnail', file);
+        setThumbnailPreviewUrl(file ? URL.createObjectURL(file) : null);
+    };
+
+    const resetThumbnailDialog = () => {
+        selectThumbnail(null);
+        thumbnailUpload.resetAndClearErrors();
+        setThumbnailOpen(false);
+    };
+
+    const closeThumbnailDialog = () => {
+        if (!thumbnailUpload.processing) {
+            resetThumbnailDialog();
+        }
+    };
+
+    const updateThumbnail = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        if (!thumbnailUpload.data.thumbnail) {
+            thumbnailUpload.setError('thumbnail', 'Choose an image to upload.');
+
+            return;
+        }
+
+        await thumbnailUpload.post(
+            PromptThumbnailController.url(promptItem.id),
+            {
+                onSuccess: () => {
+                    resetThumbnailDialog();
+                    router.reload({ only: ['promptItem'] });
+                },
+            },
+        );
+    };
 
     const deletePrompt = () => {
         router.delete(AdminPromptController.destroy(promptItem.id), {
@@ -176,7 +236,16 @@ export default function EditPrompt({
                     <aside className="space-y-4">
                         <Card className="overflow-hidden rounded-xl py-0">
                             <div className="relative">
-                                <div className="absolute top-3 right-3 z-10">
+                                <div className="absolute top-3 right-3 z-10 flex flex-wrap justify-end gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        className="border-white/20 bg-white/90 text-black shadow-lg backdrop-blur hover:bg-white"
+                                        onClick={() => setThumbnailOpen(true)}
+                                    >
+                                        <Upload />
+                                        Upload thumbnail
+                                    </Button>
                                     {!imageAiConfiguration.is_configured ||
                                     promptItem.status === 'processing' ||
                                     !promptItem.prompt ? (
@@ -660,6 +729,125 @@ export default function EditPrompt({
                             Delete prompt
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={thumbnailOpen}
+                onOpenChange={(open) => {
+                    if (open) {
+                        setThumbnailOpen(true);
+                    } else {
+                        closeThumbnailDialog();
+                    }
+                }}
+            >
+                <DialogContent>
+                    <form className="grid gap-5" onSubmit={updateThumbnail}>
+                        <DialogHeader>
+                            <DialogTitle>Update thumbnail image</DialogTitle>
+                            <DialogDescription>
+                                Choose a JPG, PNG, or WEBP image up to 5MB. The
+                                current thumbnail will be replaced after the
+                                upload succeeds.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <button
+                            type="button"
+                            className="group relative overflow-hidden rounded-xl border border-dashed bg-muted/40 text-left transition-colors hover:border-primary/50 hover:bg-muted/70"
+                            onClick={() => thumbnailInputRef.current?.click()}
+                        >
+                            {thumbnailPreviewUrl ? (
+                                <img
+                                    src={thumbnailPreviewUrl}
+                                    alt="New thumbnail preview"
+                                    className="aspect-[4/3] w-full object-cover"
+                                />
+                            ) : (
+                                <span className="flex aspect-[4/3] flex-col items-center justify-center gap-3 p-6 text-center">
+                                    <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                        <Upload className="size-5" />
+                                    </span>
+                                    <span>
+                                        <span className="block font-medium">
+                                            Choose thumbnail image
+                                        </span>
+                                        <span className="mt-1 block text-sm text-muted-foreground">
+                                            Click to browse your device
+                                        </span>
+                                    </span>
+                                </span>
+                            )}
+                            {thumbnailPreviewUrl && (
+                                <span className="absolute inset-x-3 bottom-3 rounded-lg bg-black/70 px-3 py-2 text-center text-sm font-medium text-white opacity-0 backdrop-blur transition-opacity group-hover:opacity-100">
+                                    Choose a different image
+                                </span>
+                            )}
+                        </button>
+
+                        <input
+                            ref={thumbnailInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="sr-only"
+                            onChange={(event) =>
+                                selectThumbnail(event.target.files?.[0] ?? null)
+                            }
+                        />
+                        <FieldError
+                            message={fieldError(
+                                thumbnailUpload.errors,
+                                'thumbnail',
+                            )}
+                        />
+
+                        {thumbnailUpload.progress && (
+                            <div className="grid gap-2">
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>Uploading thumbnail</span>
+                                    <span>
+                                        {thumbnailUpload.progress.percentage}%
+                                    </span>
+                                </div>
+                                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                    <div
+                                        className="h-full bg-primary transition-all"
+                                        style={{
+                                            width: `${thumbnailUpload.progress.percentage}%`,
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={thumbnailUpload.processing}
+                                onClick={closeThumbnailDialog}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={
+                                    thumbnailUpload.processing ||
+                                    !thumbnailUpload.data.thumbnail
+                                }
+                            >
+                                {thumbnailUpload.processing ? (
+                                    <LoaderCircle className="animate-spin" />
+                                ) : (
+                                    <Upload />
+                                )}
+                                {thumbnailUpload.processing
+                                    ? 'Uploading…'
+                                    : 'Update thumbnail'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
                 </DialogContent>
             </Dialog>
         </>
