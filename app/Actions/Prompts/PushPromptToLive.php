@@ -13,7 +13,6 @@ class PushPromptToLive
     public function handle(Prompt $prompt): Response
     {
         $baseUrl = rtrim((string) config('services.prompt_live.url'), '/');
-        $token = (string) config('services.prompt_live.token');
         $thumbnailPath = $prompt->thumbnail_path;
 
         if ($baseUrl === '') {
@@ -31,15 +30,9 @@ class PushPromptToLive
         }
 
         try {
-            $request = Http::acceptJson()
+            return Http::acceptJson()
                 ->connectTimeout(5)
-                ->timeout((int) config('services.prompt_live.timeout', 30));
-
-            if ($token !== '') {
-                $request->withToken($token);
-            }
-
-            return $request
+                ->timeout((int) config('services.prompt_live.timeout', 30))
                 ->attach('thumbnail', $stream, basename($thumbnailPath))
                 ->post("{$baseUrl}/api/prompts/full", $this->payload($prompt))
                 ->throw();

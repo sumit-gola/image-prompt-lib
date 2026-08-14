@@ -11,7 +11,6 @@ test('an admin can push a prompt with its thumbnail image to the live API', func
     Storage::disk('public')->put('prompts/thumbnails/live.webp', 'thumbnail contents');
     config()->set('services.prompt_live', [
         'url' => 'http://127.0.0.1:8081',
-        'token' => 'live-secret',
         'user_id' => 77,
         'timeout' => 30,
     ]);
@@ -43,7 +42,7 @@ test('an admin can push a prompt with its thumbnail image to the live API', func
             ->mapWithKeys(fn (array $part): array => [$part['name'] => $part['contents']]);
 
         return $request->url() === 'http://127.0.0.1:8081/api/prompts/full'
-            && $request->hasHeader('Authorization', 'Bearer live-secret')
+            && ! $request->hasHeader('Authorization')
             && $fields->get('prompt_id') === $prompt->prompt_id
             && (string) $fields->get('user_id') === '77'
             && $fields->get('title') === 'Reusable portrait template'
@@ -77,12 +76,11 @@ test('a non-admin cannot push a prompt live', function (): void {
     Http::assertNothingSent();
 });
 
-test('the live API token is optional', function (): void {
+test('the live API request does not send authorization', function (): void {
     Storage::fake('public');
     Storage::disk('public')->put('prompts/thumbnails/live.webp', 'thumbnail contents');
     config()->set('services.prompt_live', [
         'url' => 'http://127.0.0.1:8081',
-        'token' => null,
         'user_id' => null,
         'timeout' => 30,
     ]);
