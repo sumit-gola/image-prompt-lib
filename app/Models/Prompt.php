@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use LogicException;
 
 /**
  * @property int $id
@@ -33,6 +35,10 @@ use Illuminate\Support\Carbon;
  * @property array<string, string|null>|null $style_notes
  * @property string|null $ai_provider
  * @property string|null $ai_model
+ * @property int|null $base_prompt_id
+ * @property string|null $variation_preset
+ * @property string|null $variation_key
+ * @property array<string, mixed>|null $variation_variables
  * @property string $status
  * @property int $copy_count
  * @property string|null $error_message
@@ -61,6 +67,15 @@ use Illuminate\Support\Carbon;
     'style_notes',
     'ai_provider',
     'ai_model',
+    'is_template',
+    'base_prompt_id',
+    'variation_preset',
+    'variation_key',
+    'variation_variables',
+    'image_rights_status',
+    'image_rights_basis',
+    'image_rights_evidence',
+    'image_rights_verified_at',
     'status',
     'copy_count',
     'error_message',
@@ -91,10 +106,13 @@ class Prompt extends Model
 
     public const GENERATION_MODE_IMPORTED = 'imported';
 
+    public const GENERATION_MODE_VARIANT = 'variant';
+
     public const GENERATION_MODES = [
         self::GENERATION_MODE_REFERENCE_IMAGE,
         self::GENERATION_MODE_AUTO,
         self::GENERATION_MODE_IMPORTED,
+        self::GENERATION_MODE_VARIANT,
     ];
 
     public const CATEGORY_PORTRAIT = 'portrait';
@@ -117,6 +135,39 @@ class Prompt extends Model
         self::CATEGORY_ART,
         self::CATEGORY_OTHER,
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (Prompt $prompt): void {
+            if ($prompt->base_prompt_id === null) {
+                return;
+            }
+
+            if ($prompt->exists && $prompt->base_prompt_id === $prompt->id) {
+                throw new LogicException('A prompt cannot be its own parent.');
+            }
+
+            $parent = self::query()->find($prompt->base_prompt_id);
+            $visited = $prompt->exists ? [$prompt->id => true] : [];
+
+            while ($parent instanceof self) {
+                if (isset($visited[$parent->id])) {
+                    throw new LogicException('Circular prompt variant relationships are not allowed.');
+                }
+
+                $visited[$parent->id] = true;
+                $parent = $parent->base_prompt_id === null
+                    ? null
+                    : self::query()->find($parent->base_prompt_id);
+            }
+        });
+
+        static::deleting(function (Prompt $prompt): void {
+            if ($prompt->variants()->exists()) {
+                throw new LogicException('A parent prompt with variants cannot be deleted.');
+            }
+        });
+    }
 
     /** @use HasFactory<PromptFactory> */
     use HasFactory;
@@ -143,6 +194,65 @@ class Prompt extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** @return BelongsTo<Prompt, $this> */
+    public function basePrompt(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'base_prompt_id');
+    }
+
+    /** @return HasMany<Prompt, $this> */
+    public function variants(): HasMany
+    {
+        return $this->hasMany(self::class, 'base_prompt_id');
+    }
+
+    public function isVariant(): bool
+    {
+        return $this->base_prompt_id !== null;
+    }
+
+    public function rootPrompt(): self
+    {
+        $prompt = $this;
+        $visited = [];
+
+        while ($prompt->base_prompt_id !== null && ! isset($visited[$prompt->id])) {
+            $visited[$prompt->id] = true;
+            $parent = $prompt->basePrompt()->first();
+
+            if (! $parent instanceof self) {
+                break;
+            }
+
+            $prompt = $parent;
+        }
+
+        return $prompt;
+    }
+
+    /** @param array<string, mixed> $variables */
+    public function hasVariantFor(array $variables): bool
+    {
+        return $this->rootPrompt()->variants()
+            ->where('variation_preset', 'subject-demographic')
+            ->where('variation_key', self::variationKey($variables))
+            ->exists();
+    }
+
+    public function variantCount(): int
+    {
+        return $this->rootPrompt()->variants()->count();
+    }
+
+    /** @param array<string, mixed> $variables */
+    public static function variationKey(array $variables): string
+    {
+        $subject = is_array($variables['subject'] ?? null) ? $variables['subject'] : $variables;
+        ksort($subject);
+
+        return hash('sha256', json_encode($subject, JSON_THROW_ON_ERROR));
     }
 
     /**
@@ -239,6 +349,9 @@ class Prompt extends Model
     {
         return [
             'style_notes' => 'array',
+            'variation_variables' => 'array',
+            'is_template' => 'boolean',
+            'image_rights_verified_at' => 'datetime',
             'copy_count' => 'integer',
             'source_published_at' => 'datetime',
             'source_modified_at' => 'datetime',

@@ -3,7 +3,24 @@ export type PromptCategory =
 
 export type PromptStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
-export type PromptGenerationMode = 'reference_image' | 'auto' | 'imported';
+export type PromptGenerationMode =
+    'reference_image' | 'auto' | 'imported' | 'variant';
+
+export type PromptVariationVariables = {
+    subject?: {
+        gender_presentation?: string | null;
+        age_group?: string | null;
+        age_range?: string | null;
+        custom_instruction?: string | null;
+    };
+    preserve?: string[];
+    image_option?: string;
+    generation?: {
+        change_summary?: string[];
+        preserved_elements?: string[];
+        safety_notes?: string[];
+    };
+};
 
 export type PromptSort =
     'newest' | 'popular' | 'most_copied' | 'oldest' | 'category';
@@ -55,6 +72,15 @@ export type PromptLibraryItem = {
     image_alt: string;
     detail_url: string;
     generation_mode: PromptGenerationMode;
+    is_template?: boolean;
+    base_prompt_id?: number | null;
+    base_prompt?: {
+        id: number;
+        title: string;
+        detail_url: string;
+    } | null;
+    variation_preset?: string | null;
+    variation_variables?: PromptVariationVariables | null;
     source_idea: string | null;
     category: PromptCategory | null;
     style_notes: PromptStyleNotes | null;

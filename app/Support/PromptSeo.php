@@ -114,7 +114,7 @@ class PromptSeo
                 'image' => $image,
             ],
             'structured_data' => [
-                [
+                array_filter([
                     '@context' => 'https://schema.org',
                     '@type' => 'CreativeWork',
                     'name' => $prompt->title,
@@ -124,7 +124,10 @@ class PromptSeo
                     'genre' => $categoryTitle,
                     'datePublished' => $prompt->generated_at?->toAtomString(),
                     'url' => $canonicalUrl,
-                ],
+                    'isBasedOn' => is_array($promptData['base_prompt'] ?? null)
+                        ? ($promptData['base_prompt']['detail_url'] ?? null)
+                        : null,
+                ], fn (mixed $value): bool => $value !== null),
                 [
                     '@context' => 'https://schema.org',
                     '@type' => 'ImageObject',

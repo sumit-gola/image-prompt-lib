@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\PromptVariantController;
 use App\Http\Controllers\Admin\PushPromptToLiveController;
 use App\Http\Controllers\AdminPromptController;
 use App\Http\Controllers\DashboardController;
@@ -40,6 +41,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('prompts/{prompt}/edit', [AdminPromptController::class, 'edit'])->name('prompts.edit');
         Route::patch('prompts/{prompt}', [AdminPromptController::class, 'update'])->name('prompts.update');
         Route::post('prompts/{prompt}/regenerate', [AdminPromptController::class, 'regenerate'])->name('prompts.regenerate');
+        Route::post('prompts/{prompt}/variants', [PromptVariantController::class, 'store'])
+            ->middleware('throttle:5,1')
+            ->name('prompts.variants.store');
+        Route::post('prompts/{prompt}/variants/{variant}/regenerate', [PromptVariantController::class, 'regenerate'])
+            ->middleware('throttle:10,1')
+            ->name('prompts.variants.regenerate');
+        Route::delete('prompts/{prompt}/variants/{variant}', [PromptVariantController::class, 'destroy'])
+            ->name('prompts.variants.destroy');
         Route::post('prompts/{prompt}/push-live', PushPromptToLiveController::class)
             ->middleware('throttle:10,1')
             ->name('prompts.push-live');

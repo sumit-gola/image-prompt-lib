@@ -128,6 +128,7 @@ const generationModeLabels: Record<PromptGenerationMode, string> = {
     reference_image: 'Reference',
     auto: 'Auto generated',
     imported: 'Imported',
+    variant: 'Variant',
 };
 
 const sourceSiteLabels: Record<SourceSiteFilter, string> = {

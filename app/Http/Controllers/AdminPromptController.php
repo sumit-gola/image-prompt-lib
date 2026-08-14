@@ -108,9 +108,17 @@ class AdminPromptController extends Controller
         Gate::authorize('update', $prompt);
 
         $prompt->loadMissing('user:id,name,email');
+        $rootPrompt = $prompt->rootPrompt();
+        $rootPrompt->loadMissing('user:id,name,email');
+        $variants = $rootPrompt->variants()
+            ->with('user:id,name,email')
+            ->latest()
+            ->get();
 
         return Inertia::render('admin/prompts/edit', [
             'promptItem' => $this->adminPromptData($prompt),
+            'basePrompt' => $prompt->isVariant() ? $this->adminPromptData($rootPrompt) : null,
+            'variants' => $variants->map(fn (Prompt $variant): array => $this->adminPromptData($variant))->values(),
             'statuses' => Prompt::STATUSES,
             'categories' => Prompt::CATEGORIES,
             'imageAiConfiguration' => $imageConfiguration->handle(),
@@ -149,6 +157,12 @@ class AdminPromptController extends Controller
     public function destroy(Prompt $prompt): RedirectResponse
     {
         Gate::authorize('delete', $prompt);
+
+        if ($prompt->variants()->exists()) {
+            return back()->withErrors([
+                'delete' => 'Delete or detach this prompt’s variants before deleting the parent.',
+            ]);
+        }
 
         $this->deletePromptAssets($prompt);
 
@@ -276,6 +290,10 @@ class AdminPromptController extends Controller
             'reference_image_url' => $referenceImageUrl,
             'detail_url' => route('prompts.show', $prompt),
             'generation_mode' => $prompt->generation_mode,
+            'is_template' => $prompt->is_template,
+            'base_prompt_id' => $prompt->base_prompt_id,
+            'variation_preset' => $prompt->variation_preset,
+            'variation_variables' => $prompt->variation_variables,
             'source_idea' => $prompt->source_idea,
             'source_site' => $prompt->source_site,
             'source_slug' => $prompt->source_slug,

@@ -160,7 +160,7 @@ class PromptController extends Controller
     {
         abort_unless($prompt->status === Prompt::STATUS_COMPLETED, 404);
 
-        $prompt->loadMissing('user:id,name');
+        $prompt->loadMissing(['user:id,name', 'basePrompt:id,title,status']);
 
         $promptData = $this->promptData($prompt, $seo);
 
@@ -215,6 +215,14 @@ class PromptController extends Controller
             'image_alt' => $seo->imageAlt($prompt),
             'detail_url' => route('prompts.show', $prompt),
             'generation_mode' => $prompt->generation_mode,
+            'base_prompt_id' => $prompt->base_prompt_id,
+            'base_prompt' => $prompt->relationLoaded('basePrompt') && $prompt->basePrompt?->status === Prompt::STATUS_COMPLETED
+                ? [
+                    'id' => $prompt->basePrompt->id,
+                    'title' => $prompt->basePrompt->title,
+                    'detail_url' => route('prompts.show', $prompt->basePrompt),
+                ]
+                : null,
             'source_idea' => $prompt->source_idea,
             'category' => $prompt->category,
             'style_notes' => $prompt->style_notes,
@@ -366,6 +374,7 @@ class PromptController extends Controller
             'thumbnail_path',
             'reference_image_path',
             'generation_mode',
+            'base_prompt_id',
             'source_idea',
             'category',
             'style_notes',

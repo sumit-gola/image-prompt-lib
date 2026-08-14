@@ -5,8 +5,10 @@ import {
     CalendarClock,
     Copy,
     ExternalLink,
+    GitBranch,
     ImageIcon,
     LoaderCircle,
+    Plus,
     Rocket,
     RefreshCw,
     Save,
@@ -17,6 +19,7 @@ import {
 import type { ComponentProps } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import PushPromptToLiveController from '@/actions/App/Http/Controllers/Admin/PushPromptToLiveController';
+import PromptVariantController from '@/actions/App/Http/Controllers/Admin/PromptVariantController';
 import AdminPromptController from '@/actions/App/Http/Controllers/AdminPromptController';
 import PromptThumbnailController from '@/actions/App/Http/Controllers/Api/PromptThumbnailController';
 import { PromptImagePlaceholder } from '@/components/prompts/prompt-image-placeholder';
@@ -51,6 +54,8 @@ import type {
 
 type Props = {
     promptItem: AdminPromptItem;
+    basePrompt: AdminPromptItem | null;
+    variants: AdminPromptItem[];
     statuses: PromptStatus[];
     categories: PromptCategory[];
     imageAiConfiguration: {
@@ -73,6 +78,7 @@ const generationModeLabels: Record<AdminPromptItem['generation_mode'], string> =
         reference_image: 'Reference image',
         auto: 'Auto generated',
         imported: 'Imported',
+        variant: 'Prompt variant',
     };
 
 const styleNoteFields: Array<keyof PromptStyleNotes> = [
@@ -89,20 +95,37 @@ const styleNoteFields: Array<keyof PromptStyleNotes> = [
 
 export default function EditPrompt({
     promptItem,
+    basePrompt,
+    variants,
     statuses,
     categories,
     imageAiConfiguration,
 }: Props) {
     usePoll(
         2000,
-        { only: ['promptItem'] },
-        { autoStart: promptItem.status === 'processing' },
+        { only: ['promptItem', 'variants'] },
+        {
+            autoStart:
+                promptItem.status === 'processing' ||
+                variants.some((variant) =>
+                    ['pending', 'processing'].includes(variant.status),
+                ),
+        },
     );
     const [status, setStatus] = useState<PromptStatus>(promptItem.status);
     const [category, setCategory] = useState<PromptCategory | 'none'>(
         promptItem.category ?? 'none',
     );
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [variantsOpen, setVariantsOpen] = useState(false);
+    const [variantRows, setVariantRows] = useState([
+        {
+            gender_presentation: 'woman',
+            age_group: 'young adult',
+            age_range: '25-34',
+            custom_instruction: '',
+        },
+    ]);
     const [pushLiveOpen, setPushLiveOpen] = useState(false);
     const [thumbnailOpen, setThumbnailOpen] = useState(false);
     const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<
@@ -193,6 +216,11 @@ export default function EditPrompt({
                                     <ModeBadge
                                         mode={promptItem.generation_mode}
                                     />
+                                    <Badge variant="outline">
+                                        {promptItem.base_prompt_id
+                                            ? 'Variant'
+                                            : 'Generic / Parent'}
+                                    </Badge>
                                     {promptItem.category && (
                                         <Badge variant="outline">
                                             {
@@ -211,6 +239,15 @@ export default function EditPrompt({
                                     and visual style metadata before publishing
                                     it to the public library.
                                 </p>
+                                {basePrompt && (
+                                    <Link
+                                        href={basePrompt.edit_url}
+                                        className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                                    >
+                                        <GitBranch className="size-4" /> Variant
+                                        of {basePrompt.title}
+                                    </Link>
+                                )}
                             </div>
                         </div>
 
@@ -714,7 +751,418 @@ export default function EditPrompt({
                         )}
                     </Form>
                 </div>
+
+                <Card className="rounded-xl">
+                    <CardHeader className="flex-row items-start justify-between gap-4">
+                        <div className="space-y-1">
+                            <CardTitle className="flex items-center gap-2">
+                                <GitBranch className="size-5" /> Variants
+                            </CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                                {variants.length} demographic variant
+                                {variants.length === 1 ? '' : 's'} linked to
+                                this family.
+                            </p>
+                        </div>
+                        <Button
+                            type="button"
+                            onClick={() => setVariantsOpen(true)}
+                        >
+                            <Plus /> Create variants
+                        </Button>
+                    </CardHeader>
+                    <CardContent className="grid gap-3">
+                        {variants.length === 0 ? (
+                            <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                                No variants yet. Create reusable versions while
+                                preserving the parent composition and style.
+                            </div>
+                        ) : (
+                            variants.map((variant) => (
+                                <div
+                                    key={variant.id}
+                                    className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center"
+                                >
+                                    <div className="size-16 overflow-hidden rounded-md bg-muted">
+                                        {variant.thumbnail_url ? (
+                                            <img
+                                                src={variant.thumbnail_url}
+                                                alt={variant.title}
+                                                className="size-full object-cover"
+                                            />
+                                        ) : (
+                                            <PromptImagePlaceholder className="size-full" />
+                                        )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <p className="truncate font-medium">
+                                                {variant.title}
+                                            </p>
+                                            <StatusBadge
+                                                status={variant.status}
+                                            />
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">
+                                            {[
+                                                variant.variation_variables
+                                                    ?.subject
+                                                    ?.gender_presentation,
+                                                variant.variation_variables
+                                                    ?.subject?.age_group,
+                                                variant.variation_variables
+                                                    ?.subject?.age_range,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(' · ') ||
+                                                'Custom demographic'}
+                                        </p>
+                                        {variant.error_message && (
+                                            <p className="line-clamp-1 text-sm text-destructive">
+                                                {variant.error_message}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            asChild
+                                            size="sm"
+                                            variant="outline"
+                                        >
+                                            <Link href={variant.edit_url}>
+                                                Edit
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            asChild
+                                            size="sm"
+                                            variant="outline"
+                                        >
+                                            <Link
+                                                href={PromptVariantController.regenerate(
+                                                    {
+                                                        prompt:
+                                                            basePrompt?.id ??
+                                                            promptItem.id,
+                                                        variant: variant.id,
+                                                    },
+                                                )}
+                                                method="post"
+                                                preserveScroll
+                                            >
+                                                <RefreshCw /> Regenerate
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            asChild
+                                            size="sm"
+                                            variant="destructive"
+                                        >
+                                            <Link
+                                                href={PromptVariantController.destroy(
+                                                    {
+                                                        prompt:
+                                                            basePrompt?.id ??
+                                                            promptItem.id,
+                                                        variant: variant.id,
+                                                    },
+                                                )}
+                                                method="delete"
+                                                preserveScroll
+                                            >
+                                                <Trash2 /> Delete
+                                            </Link>
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </CardContent>
+                </Card>
             </div>
+
+            <Dialog open={variantsOpen} onOpenChange={setVariantsOpen}>
+                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Create prompt variants</DialogTitle>
+                        <DialogDescription>
+                            Generate independent drafts. The parent prompt and
+                            assets are never modified.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Form
+                        {...PromptVariantController.store.form(
+                            basePrompt?.id ?? promptItem.id,
+                        )}
+                        onSuccess={() => setVariantsOpen(false)}
+                    >
+                        {({ errors, processing }) => (
+                            <div className="grid gap-5">
+                                <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+                                    <span className="font-medium">Parent:</span>{' '}
+                                    {basePrompt?.title ?? promptItem.title}
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            setVariantRows([
+                                                {
+                                                    gender_presentation:
+                                                        'woman',
+                                                    age_group: 'young adult',
+                                                    age_range: '25-34',
+                                                    custom_instruction: '',
+                                                },
+                                                {
+                                                    gender_presentation: 'man',
+                                                    age_group:
+                                                        'middle-aged adult',
+                                                    age_range: '45-54',
+                                                    custom_instruction: '',
+                                                },
+                                            ])
+                                        }
+                                    >
+                                        Adult pair
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            setVariantRows([
+                                                {
+                                                    gender_presentation: 'girl',
+                                                    age_group: 'child',
+                                                    age_range: '8-12',
+                                                    custom_instruction: '',
+                                                },
+                                                {
+                                                    gender_presentation: 'boy',
+                                                    age_group: 'teenager',
+                                                    age_range: '13-17',
+                                                    custom_instruction: '',
+                                                },
+                                            ])
+                                        }
+                                    >
+                                        Youth pair
+                                    </Button>
+                                </div>
+                                {variantRows.map((row, index) => (
+                                    <div
+                                        key={index}
+                                        className="grid gap-3 rounded-lg border p-3 md:grid-cols-3"
+                                    >
+                                        <VariantSelect
+                                            label="Presentation"
+                                            name={`variants[${index}][gender_presentation]`}
+                                            value={row.gender_presentation}
+                                            options={[
+                                                'woman',
+                                                'man',
+                                                'girl',
+                                                'boy',
+                                                'gender-neutral adult',
+                                            ]}
+                                            onChange={(value) =>
+                                                setVariantRows((rows) =>
+                                                    rows.map(
+                                                        (item, itemIndex) =>
+                                                            itemIndex === index
+                                                                ? {
+                                                                      ...item,
+                                                                      gender_presentation:
+                                                                          value,
+                                                                  }
+                                                                : item,
+                                                    ),
+                                                )
+                                            }
+                                        />
+                                        <VariantSelect
+                                            label="Age group"
+                                            name={`variants[${index}][age_group]`}
+                                            value={row.age_group}
+                                            options={[
+                                                'child',
+                                                'teenager',
+                                                'young adult',
+                                                'adult',
+                                                'middle-aged adult',
+                                                'older adult',
+                                            ]}
+                                            onChange={(value) =>
+                                                setVariantRows((rows) =>
+                                                    rows.map(
+                                                        (item, itemIndex) =>
+                                                            itemIndex === index
+                                                                ? {
+                                                                      ...item,
+                                                                      age_group:
+                                                                          value,
+                                                                  }
+                                                                : item,
+                                                    ),
+                                                )
+                                            }
+                                        />
+                                        <div className="grid gap-2">
+                                            <Label>Age range</Label>
+                                            <Input
+                                                name={`variants[${index}][age_range]`}
+                                                value={row.age_range}
+                                                onChange={(event) =>
+                                                    setVariantRows((rows) =>
+                                                        rows.map(
+                                                            (
+                                                                item,
+                                                                itemIndex,
+                                                            ) =>
+                                                                itemIndex ===
+                                                                index
+                                                                    ? {
+                                                                          ...item,
+                                                                          age_range:
+                                                                              event
+                                                                                  .target
+                                                                                  .value,
+                                                                      }
+                                                                    : item,
+                                                        ),
+                                                    )
+                                                }
+                                                placeholder="25-34"
+                                            />
+                                        </div>
+                                        <div className="grid gap-2 md:col-span-3">
+                                            <Label>
+                                                Custom instruction (optional)
+                                            </Label>
+                                            <Input
+                                                name={`variants[${index}][custom_instruction]`}
+                                                value={row.custom_instruction}
+                                                onChange={(event) =>
+                                                    setVariantRows((rows) =>
+                                                        rows.map(
+                                                            (
+                                                                item,
+                                                                itemIndex,
+                                                            ) =>
+                                                                itemIndex ===
+                                                                index
+                                                                    ? {
+                                                                          ...item,
+                                                                          custom_instruction:
+                                                                              event
+                                                                                  .target
+                                                                                  .value,
+                                                                      }
+                                                                    : item,
+                                                        ),
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        {variantRows.length > 1 && (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="ghost"
+                                                className="md:col-span-3 md:justify-self-start"
+                                                onClick={() =>
+                                                    setVariantRows((rows) =>
+                                                        rows.filter(
+                                                            (_, itemIndex) =>
+                                                                itemIndex !==
+                                                                index,
+                                                        ),
+                                                    )
+                                                }
+                                            >
+                                                Remove row
+                                            </Button>
+                                        )}
+                                    </div>
+                                ))}
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={variantRows.length >= 10}
+                                    onClick={() =>
+                                        setVariantRows((rows) => [
+                                            ...rows,
+                                            {
+                                                gender_presentation: 'woman',
+                                                age_group: 'adult',
+                                                age_range: '',
+                                                custom_instruction: '',
+                                            },
+                                        ])
+                                    }
+                                >
+                                    <Plus /> Add variant
+                                </Button>
+                                {[
+                                    'composition',
+                                    'camera',
+                                    'framing',
+                                    'pose',
+                                    'lighting',
+                                    'background',
+                                    'clothing_style',
+                                    'color_palette',
+                                    'mood',
+                                    'image_effect',
+                                    'negative_prompt_intent',
+                                ].map((value) => (
+                                    <input
+                                        key={value}
+                                        type="hidden"
+                                        name="preserve[]"
+                                        value={value}
+                                    />
+                                ))}
+                                <VariantSelect
+                                    label="Image handling"
+                                    name="image_option"
+                                    value="text_only"
+                                    options={[
+                                        'text_only',
+                                        'generate_thumbnail',
+                                        'reuse_reference',
+                                        'generate_later',
+                                    ]}
+                                />
+                                <FieldError
+                                    message={fieldError(errors, 'variants')}
+                                />
+                                <DialogFooter>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setVariantsOpen(false)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={processing}>
+                                        {processing ? (
+                                            <LoaderCircle className="animate-spin" />
+                                        ) : (
+                                            <Sparkles />
+                                        )}{' '}
+                                        Create {variantRows.length} variant
+                                        {variantRows.length === 1 ? '' : 's'}
+                                    </Button>
+                                </DialogFooter>
+                            </div>
+                        )}
+                    </Form>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                 <DialogContent>
@@ -1002,6 +1450,43 @@ function FileField({
                 JPG, PNG, or WEBP up to 5MB.
             </p>
             <FieldError message={error} />
+        </div>
+    );
+}
+
+function VariantSelect({
+    label,
+    name,
+    value,
+    options,
+    onChange,
+}: {
+    label: string;
+    name: string;
+    value: string;
+    options: string[];
+    onChange?: (value: string) => void;
+}) {
+    return (
+        <div className="grid gap-2">
+            <Label htmlFor={name}>{label}</Label>
+            <select
+                id={name}
+                name={name}
+                {...(onChange
+                    ? {
+                          value,
+                          onChange: (event) => onChange(event.target.value),
+                      }
+                    : { defaultValue: value })}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs"
+            >
+                {options.map((option) => (
+                    <option key={option} value={option}>
+                        {humanize(option)}
+                    </option>
+                ))}
+            </select>
         </div>
     );
 }

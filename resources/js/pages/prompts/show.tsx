@@ -200,6 +200,18 @@ export default function PromptShow({
                                     </div>
 
                                     <div className="space-y-3">
+                                        {promptItem.base_prompt && (
+                                            <Link
+                                                href={
+                                                    promptItem.base_prompt
+                                                        .detail_url
+                                                }
+                                                className="inline-flex items-center gap-2 text-sm font-semibold text-lumen-primary-bright hover:underline"
+                                            >
+                                                Variant of{' '}
+                                                {promptItem.base_prompt.title}
+                                            </Link>
+                                        )}
                                         <h1 className="text-4xl leading-none font-semibold text-balance text-lumen-text sm:text-5xl">
                                             {promptItem.title}
                                         </h1>
