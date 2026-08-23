@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\PromptVariantController;
 use App\Http\Controllers\Admin\PushPromptToLiveController;
+use App\Http\Controllers\Admin\SocialPostController;
 use App\Http\Controllers\AdminPromptController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ImageToPromptController;
@@ -56,6 +57,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('throttle:10,1')
             ->name('prompts.thumbnail');
         Route::delete('prompts/{prompt}', [AdminPromptController::class, 'destroy'])->name('prompts.destroy');
+        Route::post('social-posts/{socialPost}/retry', [SocialPostController::class, 'retry'])->name('social-posts.retry');
+        Route::resource('social-posts', SocialPostController::class)->only(['index', 'store', 'update', 'destroy']);
     });
 });
 
