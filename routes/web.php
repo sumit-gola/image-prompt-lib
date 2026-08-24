@@ -9,6 +9,7 @@ use App\Http\Controllers\ImageToPromptController;
 use App\Http\Controllers\PromptController;
 use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\SeoController;
+use App\Http\Controllers\VideoAnalysisController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('robots.txt', [SeoController::class, 'robots'])->name('seo.robots');
@@ -33,6 +34,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('image-to-prompt', [ImageToPromptController::class, 'store'])
         ->middleware('throttle:10,1')
         ->name('image-to-prompt.store');
+    Route::resource('video-analyses', VideoAnalysisController::class)->only(['index', 'store', 'show', 'destroy']);
+    Route::post('video-analyses/{videoAnalysis}/regenerate', [VideoAnalysisController::class, 'regenerate'])->name('video-analyses.regenerate');
 
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('prompts', [AdminPromptController::class, 'index'])->name('prompts.index');

@@ -7,10 +7,12 @@ import {
     Images,
     LayoutGrid,
     Shield,
+    Film,
 } from 'lucide-react';
 import AdminPromptController from '@/actions/App/Http/Controllers/AdminPromptController';
 import ImageToPromptController from '@/actions/App/Http/Controllers/ImageToPromptController';
 import PromptController from '@/actions/App/Http/Controllers/PromptController';
+import VideoAnalysisController from '@/actions/App/Http/Controllers/VideoAnalysisController';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -57,6 +59,11 @@ export function AppSidebar() {
             title: 'Image to Prompt',
             href: ImageToPromptController.index(),
             icon: ImagePlus,
+        },
+        {
+            title: 'Video to Prompt',
+            href: VideoAnalysisController.index(),
+            icon: Film,
         },
         ...(auth.user?.is_admin
             ? [

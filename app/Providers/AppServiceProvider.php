@@ -3,8 +3,10 @@
 namespace App\Providers;
 
 use App\Models\Prompt;
+use App\Models\VideoAnalysis;
 use App\Observers\PromptObserver;
 use App\Policies\PromptPolicy;
+use App\Policies\VideoAnalysisPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -31,6 +33,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(Prompt::class, PromptPolicy::class);
+        Gate::policy(VideoAnalysis::class, VideoAnalysisPolicy::class);
         Prompt::observe(PromptObserver::class);
 
         $this->configureDefaults();
